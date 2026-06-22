@@ -321,8 +321,7 @@ async function syncDrivePhotos() {
 
 function buildCaption(photo) {
   if (!photo) return '';
-  const photographerLine = photo.photographerName ? `撮影: ${photo.photographerName}\n\n` : '';
-  return `自然の中で、必要なものだけを研ぎ澄ます。\n\n${photo.angle}を伝える1枚として、MONORAL OUTDOORの道具がある時間を切り取ります。\n\n${photographerLine}投稿元: Google Drive\n${driveFolderUrl}\n\n${instagramUrl}`;
+  return `自然の中で、必要なものだけを研ぎ澄ます。\n\n${photo.angle}を伝える1枚として、MONORAL OUTDOORの道具がある時間を切り取ります。`;
 }
 
 function captionSeed(photo) {
@@ -349,13 +348,11 @@ function generateMonoralCaption(photo) {
 
   const scenes = sceneWords(photo);
   const scene = scenes[captionSeed(photo) % scenes.length];
-  const photographerLine = photo.photographerName ? `Photo: ${photo.photographerName}` : '';
-  const locationHint = photo.folderPath ? `\n${photo.folderPath}` : '';
   const templates = [
-    `${scene}に、必要なものだけを持ち込む。\n\n大きく足さず、静かに整える。\nMONORAL OUTDOORの道具は、そんな時間のそばにあります。\n\n${photographerLine}${locationHint}`,
-    `火を眺める、座る、湯を沸かす。\n\nひとつひとつの動作が、外で過ごす時間を少しだけ深くしてくれる。\n\nMONORAL OUTDOOR\n${photographerLine}${locationHint}`,
-    `${scene}の中で、道具が景色に馴染んでいく。\n\n使うほどに自然になり、必要な瞬間だけしっかり応える。\n\n${photographerLine}${locationHint}`,
-    `余白のある場所へ。\n\n軽く、強く、無理なく使えること。\nMONORAL OUTDOORが大切にしている感覚です。\n\n${photographerLine}${locationHint}`
+    `${scene}に、必要なものだけを持ち込む。\n\n大きく足さず、静かに整える。\nMONORAL OUTDOORの道具は、そんな時間のそばにあります。`,
+    `火を眺める、座る、湯を沸かす。\n\nひとつひとつの動作が、外で過ごす時間を少しだけ深くしてくれる。\n\nMONORAL OUTDOOR`,
+    `${scene}の中で、道具が景色に馴染んでいく。\n\n使うほどに自然になり、必要な瞬間だけしっかり応える。`,
+    `余白のある場所へ。\n\n軽く、強く、無理なく使えること。\nMONORAL OUTDOORが大切にしている感覚です。`
   ];
 
   return templates[captionSeed(photo) % templates.length]
@@ -471,7 +468,7 @@ function render() {
   if (focused) {
     previewImage.src = focused.src;
     previewImage.alt = focused.name;
-    caption.value = buildCaption(focused);
+    caption.value = '';
     hashtags.value = defaultHashtags();
   } else {
     previewImage.removeAttribute('src');
