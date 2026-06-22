@@ -14,13 +14,34 @@ Open:
 http://127.0.0.1:5174/
 ```
 
+## Cloud Deploy
+
+This repository can deploy to GitHub Pages from the `main` branch root.
+
+Expected URL:
+
+```text
+https://tsdesignltd.github.io/monoral_insta/
+```
+
+After pushing, enable Pages in the GitHub repository settings:
+
+```text
+Settings > Pages > Build and deployment
+Source: Deploy from a branch
+Branch: main
+Folder: / (root)
+```
+
 ## Google Drive Sync
 
 1. Google Cloud ConsoleでGoogle Drive APIを有効化します。
 2. OAuth同意画面を設定します。
 3. OAuth Client IDを作成します。
    - Application type: Web application
-   - Authorized JavaScript origins: `http://127.0.0.1:5174`
+   - Authorized JavaScript origins:
+     - `http://127.0.0.1:5174`
+     - `https://tsdesignltd.github.io`
 4. アプリ画面の `Google OAuth Client ID` にClient IDを入力します。
 5. `Drive同期` を押し、GoogleアカウントでDrive読み取り権限を許可します。
 
