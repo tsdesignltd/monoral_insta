@@ -414,6 +414,9 @@ button.is-loading::before {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 12px;
   padding: 18px;
+  max-height: 1020px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .latest-section {
@@ -555,15 +558,15 @@ button.is-loading::before {
 .photo-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   background: var(--sky);
 }
 
 .photo-body {
   display: grid;
-  gap: 10px;
-  padding: 10px;
+  gap: 7px;
+  padding: 9px;
 }
 
 .photo-name {
@@ -571,6 +574,10 @@ button.is-loading::before {
   font-size: 0.84rem;
   font-weight: 800;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .photo-meta {
@@ -579,6 +586,10 @@ button.is-loading::before {
   font-size: 0.75rem;
   font-weight: 750;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .photo-path {
@@ -587,6 +598,10 @@ button.is-loading::before {
   font-size: 0.68rem;
   font-weight: 700;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .score-row {
@@ -608,6 +623,11 @@ button.is-loading::before {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+}
+
+.card-actions button {
+  min-height: 34px;
+  padding: 0 8px;
 }
 
 .keep {
