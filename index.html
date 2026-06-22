@@ -31,7 +31,8 @@
         </section>
 
         <nav class="steps" aria-label="workflow">
-          <a href="#latest" class="step is-active">最新30枚</a>
+          <a href="#latest" class="step">最新10枚</a>
+          <a href="#select" class="step is-active">選別</a>
           <a href="#compose" class="step">投稿作成</a>
           <a href="#queue" class="step">承認キュー</a>
         </nav>
@@ -84,16 +85,39 @@
           </article>
         </section>
 
+        <section id="latest" class="latest-section" aria-label="latest photos by photographer">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Latest by photographer</p>
+              <h3>撮影者ごとの最新10枚</h3>
+            </div>
+            <span class="limit-pill">各10枚</span>
+          </div>
+          <div id="latestByPhotographer" class="latest-list"></div>
+        </section>
+
         <section class="main-grid">
-          <section id="latest" class="latest-section" aria-label="latest photos by photographer">
+          <section id="select" class="photo-section" aria-label="photo selection">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Latest by photographer</p>
-                <h3>撮影者ごとの最新30枚</h3>
+                <p class="eyebrow">Select</p>
+                <h3>写真を取捨選択</h3>
               </div>
-              <span class="limit-pill">各30枚</span>
+              <div class="selection-controls">
+                <label class="compact-field">
+                  撮影者
+                  <select id="photographerSelect" disabled>
+                    <option value="all">Drive同期後に表示</option>
+                  </select>
+                </label>
+                <div class="filter-group" role="group" aria-label="photo filters">
+                  <button class="filter is-active" data-filter="all" type="button">すべて</button>
+                  <button class="filter" data-filter="selected" type="button">採用</button>
+                  <button class="filter" data-filter="rejected" type="button">保留</button>
+                </div>
+              </div>
             </div>
-            <div id="latestByPhotographer" class="latest-list"></div>
+            <div id="photoGrid" class="photo-grid"></div>
           </section>
 
           <aside id="compose" class="composer" aria-label="post composer">

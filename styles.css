@@ -404,8 +404,23 @@ button.is-loading::before {
   border-bottom: 1px solid var(--line);
 }
 
+.filter.is-active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  padding: 18px;
+  max-height: 1020px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .latest-section {
-  min-width: 0;
+  margin-bottom: 18px;
 }
 
 .limit-pill {
@@ -471,26 +486,11 @@ button.is-loading::before {
 
 .latest-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
-  gap: 12px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(104px, 128px);
+  gap: 10px;
+  overflow-x: auto;
   padding: 12px;
-}
-
-.latest-photo-card {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-}
-
-.latest-photo-card.is-focused {
-  outline: 3px solid var(--sun);
-}
-
-.latest-photo-card.is-rejected {
-  opacity: 0.58;
 }
 
 .latest-photo {
@@ -521,33 +521,11 @@ button.is-loading::before {
   font-size: 0.72rem;
   font-weight: 750;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.latest-photo span {
-  color: var(--ink);
-  font-size: 0.82rem;
-  font-weight: 850;
-  -webkit-line-clamp: 1;
 }
 
 .latest-photo small {
   color: #8a9188;
   font-size: 0.66rem;
-  -webkit-line-clamp: 2;
-}
-
-.latest-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.latest-actions button {
-  min-height: 34px;
-  padding: 0 8px;
 }
 
 .empty-grid {
