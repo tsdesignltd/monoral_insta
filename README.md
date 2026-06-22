@@ -49,14 +49,14 @@ Folder: / (root)
 
 ## Instagram Publishing
 
-投稿ボタンはInstagram Graph APIを使います。
+投稿ボタンはInstagram APIを使います。
 
 Required:
 
 - Instagramプロアカウント
 - Metaアプリ
-- Instagram Business Account ID
-- Content publishingに必要な権限を持つAccess Token
+- Instagram Account ID: `17841403518578706`
+- `instagram_business_content_publish` を含むAccess Token
 - Meta側から取得できる公開画像URL
 
 Drive画像が非公開、またはHEICなどGraph APIが受け付けない形式の場合、投稿は失敗します。その場合はキュー内にエラーを表示します。

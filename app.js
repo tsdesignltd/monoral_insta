@@ -3,6 +3,7 @@ const driveFolderId = '1-qyygiLBAEwG8_Po0dwhog-PgkVqfiWX';
 const instagramUrl = 'https://www.instagram.com/monoral_outdoor/';
 const driveScope = 'https://www.googleapis.com/auth/drive.readonly';
 const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.apps.googleusercontent.com';
+const defaultInstagramAccountId = '17841403518578706';
 
 let photos = [];
 let photographerFolders = [];
@@ -33,7 +34,7 @@ const addToQueue = document.querySelector('#addToQueue');
 const exportPlan = document.querySelector('#exportPlan');
 
 googleClientId.value = localStorage.getItem('instaha.googleClientId') || defaultGoogleClientId;
-instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || '';
+instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || defaultInstagramAccountId;
 syncDrive.dataset.label = syncDrive.textContent.trim();
 
 function escapeHtml(value) {
@@ -76,7 +77,7 @@ function driveDownloadUrl(fileId) {
 }
 
 function instagramGraphUrl(path) {
-  return `https://graph.facebook.com/v20.0/${path}`;
+  return `https://graph.instagram.com/v25.0/${path}`;
 }
 
 async function postToInstagram(item) {
@@ -84,7 +85,7 @@ async function postToInstagram(item) {
   const token = instagramAccessToken.value.trim();
 
   if (!igUserId || !token) {
-    throw new Error('Instagram Business Account ID と Access Token を入力してください。');
+    throw new Error('Instagram Account ID と Access Token を入力してください。');
   }
 
   localStorage.setItem('insta.instagramBusinessId', igUserId);
