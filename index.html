@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>INSTA | MONORAL OUTDOOR</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="INSTA navigation">
+        <div class="brand-block">
+          <div class="brand-mark">M</div>
+          <div>
+            <p class="eyebrow">INSTA</p>
+            <h1>MONORAL OUTDOOR</h1>
+          </div>
+        </div>
+
+        <section class="source-panel" aria-label="Google Drive source">
+          <p class="panel-label">Google Drive</p>
+          <a class="drive-link" href="https://drive.google.com/drive/u/2/folders/1-qyygiLBAEwG8_Po0dwhog-PgkVqfiWX" target="_blank" rel="noreferrer">写真フォルダを開く</a>
+          <p class="folder-note">直下のサブフォルダを撮影者として扱います。</p>
+          <p class="folder-id">1-qyygiLBAEwG8_Po0dwhog-PgkVqfiWX</p>
+        </section>
+
+        <section class="account-card" aria-label="Instagram account">
+          <p class="panel-label">投稿先</p>
+          <a class="ig-account" href="https://www.instagram.com/monoral_outdoor/" target="_blank" rel="noreferrer">@monoral_outdoor</a>
+          <div class="status-pill">Meta API 接続待ち</div>
+        </section>
+
+        <nav class="steps" aria-label="workflow">
+          <a href="#latest" class="step">最新10枚</a>
+          <a href="#select" class="step is-active">選別</a>
+          <a href="#compose" class="step">投稿作成</a>
+          <a href="#queue" class="step">承認キュー</a>
+        </nav>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Photo curation workspace</p>
+            <h2>Driveの写真を選んで、Instagram投稿に仕上げる</h2>
+          </div>
+          <div class="topbar-actions">
+            <a class="button-link" href="https://drive.google.com/drive/u/2/folders/1-qyygiLBAEwG8_Po0dwhog-PgkVqfiWX" target="_blank" rel="noreferrer">Driveフォルダを開く</a>
+            <button id="syncDrive" type="button">Drive同期</button>
+          </div>
+        </header>
+
+        <section class="settings-panel" aria-label="Google Drive API settings">
+          <label>
+            Google OAuth Client ID
+            <input id="googleClientId" type="text" autocomplete="off" placeholder="xxxx.apps.googleusercontent.com">
+          </label>
+          <label>
+            Instagram Business Account ID
+            <input id="instagramBusinessId" type="text" autocomplete="off" placeholder="1784...">
+          </label>
+          <label>
+            Instagram Graph API Access Token
+            <input id="instagramAccessToken" type="password" autocomplete="off" placeholder="投稿時のみ使用">
+          </label>
+          <p id="syncStatus" class="sync-status">Client IDを入力してDrive同期を押してください。</p>
+        </section>
+
+        <section class="metrics" aria-label="posting metrics">
+          <article>
+            <span id="totalCount">0</span>
+            <p>取り込み</p>
+          </article>
+          <article>
+            <span id="selectedCount">0</span>
+            <p>採用候補</p>
+          </article>
+          <article>
+            <span id="readyCount">0</span>
+            <p>投稿準備OK</p>
+          </article>
+          <article>
+            <span id="photographerCount">0</span>
+            <p>撮影者</p>
+          </article>
+        </section>
+
+        <section id="latest" class="latest-section" aria-label="latest photos by photographer">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Latest by photographer</p>
+              <h3>撮影者ごとの最新10枚</h3>
+            </div>
+            <span class="limit-pill">各10枚</span>
+          </div>
+          <div id="latestByPhotographer" class="latest-list"></div>
+        </section>
+
+        <section class="main-grid">
+          <section id="select" class="photo-section" aria-label="photo selection">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Select</p>
+                <h3>写真を取捨選択</h3>
+              </div>
+              <div class="selection-controls">
+                <label class="compact-field">
+                  撮影者
+                  <select id="photographerSelect" disabled>
+                    <option value="all">Drive同期後に表示</option>
+                  </select>
+                </label>
+                <div class="filter-group" role="group" aria-label="photo filters">
+                  <button class="filter is-active" data-filter="all" type="button">すべて</button>
+                  <button class="filter" data-filter="selected" type="button">採用</button>
+                  <button class="filter" data-filter="rejected" type="button">保留</button>
+                </div>
+              </div>
+            </div>
+            <div id="photoGrid" class="photo-grid"></div>
+          </section>
+
+          <aside id="compose" class="composer" aria-label="post composer">
+            <div class="preview-frame">
+              <img id="previewImage" alt="選択中の写真プレビュー">
+              <div id="emptyPreview" class="empty-preview">写真を選択</div>
+            </div>
+
+            <div class="compose-fields">
+              <label>
+                投稿形式
+                <select id="postType">
+                  <option>フィード投稿</option>
+                  <option>リール</option>
+                  <option>ストーリーズ</option>
+                </select>
+              </label>
+              <button id="generateCaption" type="button" class="secondary-action">キャプション自動生成</button>
+              <label>
+                キャプション
+                <textarea id="caption" rows="7"></textarea>
+              </label>
+              <label>
+                ハッシュタグ
+                <input id="hashtags" type="text">
+              </label>
+              <button id="addToQueue" type="button" class="primary-action">承認キューへ追加</button>
+            </div>
+          </aside>
+        </section>
+
+        <section id="queue" class="queue-section" aria-label="approval queue">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Queue</p>
+              <h3>投稿承認キュー</h3>
+            </div>
+            <button id="exportPlan" type="button">投稿案をJSONで保存</button>
+          </div>
+          <div id="queueList" class="queue-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
