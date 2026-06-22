@@ -8,21 +8,18 @@ const defaultInstagramAccountId = '17841403518578706';
 let photos = [];
 let photographerFolders = [];
 let focusedId = null;
-let filter = 'all';
-let selectedPhotographer = 'all';
 let queue = [];
 let tokenClient = null;
 let accessToken = '';
 let latestOffsets = {};
+const latestPageSize = 30;
 
 const syncDrive = document.querySelector('#syncDrive');
 const googleClientId = document.querySelector('#googleClientId');
 const instagramBusinessId = document.querySelector('#instagramBusinessId');
 const instagramAccessToken = document.querySelector('#instagramAccessToken');
 const syncStatus = document.querySelector('#syncStatus');
-const photographerSelect = document.querySelector('#photographerSelect');
 const latestByPhotographer = document.querySelector('#latestByPhotographer');
-const photoGrid = document.querySelector('#photoGrid');
 const previewFrame = document.querySelector('.preview-frame');
 const previewImage = document.querySelector('#previewImage');
 const caption = document.querySelector('#caption');
@@ -309,7 +306,6 @@ async function syncDrivePhotos() {
     }
 
     photos = allPhotos.sort(sortNewestFirst);
-    selectedPhotographer = 'all';
     latestOffsets = {};
     focusedId = photos[0]?.id || null;
     setSyncStatus(`同期完了: 撮影者${photographerFolders.length}件、写真${photos.length}枚`, 'success');
@@ -376,7 +372,7 @@ function renderLatestByPhotographer() {
   if (!photographerFolders.length) {
     latestByPhotographer.innerHTML = `
       <div class="empty-grid">
-        <strong>撮影者フォルダを同期すると、ここに最新10枚ずつ表示します。</strong>
+        <strong>撮影者フォルダを同期すると、ここに最新30枚ずつ表示します。</strong>
         <span>Drive直下の各サブフォルダを撮影者として読み込み、その中の写真を更新日時の新しい順に並べます。</span>
       </div>
     `;
@@ -387,19 +383,25 @@ function renderLatestByPhotographer() {
     const allFolderPhotos = photos
       .filter((photo) => photo.photographerId === folder.id)
       .sort(sortNewestFirst);
-    const offset = Math.min(latestOffsets[folder.id] || 0, Math.max(0, allFolderPhotos.length - 10));
-    const folderPhotos = allFolderPhotos.slice(offset, offset + 10);
+    const offset = Math.min(latestOffsets[folder.id] || 0, Math.max(0, allFolderPhotos.length - latestPageSize));
+    const folderPhotos = allFolderPhotos.slice(offset, offset + latestPageSize);
     const from = allFolderPhotos.length ? offset + 1 : 0;
-    const to = Math.min(offset + 10, allFolderPhotos.length);
+    const to = Math.min(offset + latestPageSize, allFolderPhotos.length);
     const canGoPrev = offset > 0;
-    const canGoNext = offset + 10 < allFolderPhotos.length;
+    const canGoNext = offset + latestPageSize < allFolderPhotos.length;
 
     const photoCells = folderPhotos.length ? folderPhotos.map((photo) => `
-      <button class="latest-photo" type="button" data-id="${escapeHtml(photo.id)}" aria-label="${escapeHtml(`${folder.name} ${photo.name}`)}">
-        <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.name)}">
-        <span>${escapeHtml(photo.name)}</span>
-        <small>${escapeHtml(photo.folderPath || folder.name)}</small>
-      </button>
+      <article class="latest-photo-card is-${escapeHtml(photo.status)} ${photo.id === focusedId ? 'is-focused' : ''}" data-id="${escapeHtml(photo.id)}">
+        <button class="latest-photo" type="button" data-id="${escapeHtml(photo.id)}" aria-label="${escapeHtml(`${folder.name} ${photo.name}`)}">
+          <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.name)}">
+          <span>${escapeHtml(photo.name)}</span>
+          <small>${escapeHtml(photo.folderPath || folder.name)}</small>
+        </button>
+        <div class="latest-actions">
+          <button class="keep" type="button" data-action="selected">採用</button>
+          <button class="reject" type="button" data-action="rejected">保留</button>
+        </div>
+      </article>
     `).join('') : '<p class="latest-empty">この撮影者フォルダには写真がありません。</p>';
 
     return `
@@ -410,8 +412,8 @@ function renderLatestByPhotographer() {
             <span>${from}-${to} / ${allFolderPhotos.length}</span>
           </div>
           <div class="latest-pager" aria-label="${escapeHtml(folder.name)} latest pager">
-            <button type="button" data-page-action="prev" data-folder-id="${escapeHtml(folder.id)}" ${canGoPrev ? '' : 'disabled'}>前の10枚</button>
-            <button type="button" data-page-action="next" data-folder-id="${escapeHtml(folder.id)}" ${canGoNext ? '' : 'disabled'}>次の10枚</button>
+            <button type="button" data-page-action="prev" data-folder-id="${escapeHtml(folder.id)}" ${canGoPrev ? '' : 'disabled'}>前の30枚</button>
+            <button type="button" data-page-action="next" data-folder-id="${escapeHtml(folder.id)}" ${canGoNext ? '' : 'disabled'}>次の30枚</button>
           </div>
         </div>
         <div class="latest-strip">${photoCells}</div>
@@ -421,43 +423,6 @@ function renderLatestByPhotographer() {
 }
 
 function render() {
-  const visiblePhotos = photos.filter((photo) => {
-    const matchesStatus = filter === 'all' || photo.status === filter;
-    const matchesPhotographer = selectedPhotographer === 'all' || photo.photographerId === selectedPhotographer;
-    return matchesStatus && matchesPhotographer;
-  });
-
-  photographerSelect.disabled = photographerFolders.length === 0;
-  photographerSelect.innerHTML = photographerFolders.length ? [
-    '<option value="all">すべての撮影者</option>',
-    ...photographerFolders.map((folder) => `<option value="${escapeHtml(folder.id)}">${escapeHtml(folder.name)}</option>`)
-  ].join('') : '<option value="all">Drive同期後に表示</option>';
-  photographerSelect.value = selectedPhotographer;
-
-  photoGrid.innerHTML = visiblePhotos.length ? visiblePhotos.map((photo) => {
-    const dots = Array.from({ length: 5 }, (_, index) => `<span class="score-dot ${index < photo.score ? 'is-on' : ''}"></span>`).join('');
-    return `
-      <article class="photo-card ${photo.id === focusedId ? 'is-focused' : ''}" data-id="${escapeHtml(photo.id)}">
-        <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.name)}">
-        <div class="photo-body">
-          <p class="photo-name">${escapeHtml(photo.name)}</p>
-          <p class="photo-meta">${escapeHtml(photo.photographerName || '撮影者未設定')}</p>
-          <p class="photo-path">${escapeHtml(photo.folderPath || '')}</p>
-          <div class="score-row" aria-label="score ${photo.score} of 5">${dots}</div>
-          <div class="card-actions">
-            <button class="keep" type="button" data-action="selected">採用</button>
-            <button class="reject" type="button" data-action="rejected">保留</button>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join('') : `
-    <div class="empty-grid">
-      <strong>Driveフォルダ内の写真だけを候補にします。</strong>
-      <span>直下のサブフォルダ名を撮影者として読み込みます。現在はGoogle Drive API未接続のため候補は表示していません。</span>
-    </div>
-  `;
-
   document.querySelector('#totalCount').textContent = photos.length;
   document.querySelector('#selectedCount').textContent = photos.filter((photo) => photo.status === 'selected').length;
   document.querySelector('#readyCount').textContent = queue.length;
@@ -502,10 +467,10 @@ function render() {
   }).join('') : '<p class="empty-queue">採用した写真を選び、投稿案をキューに追加してください。</p>';
 }
 
-function focusPhoto(id) {
+function focusPhoto(id, markSelected = true) {
   focusedId = id;
   const focused = photos.find((photo) => photo.id === focusedId);
-  if (focused && focused.status !== 'selected') focused.status = 'selected';
+  if (markSelected && focused && focused.status !== 'selected') focused.status = 'selected';
   render();
 }
 
@@ -519,59 +484,27 @@ generateCaption.addEventListener('click', () => {
   hashtags.value = defaultHashtags();
 });
 
-photographerSelect.addEventListener('change', () => {
-  selectedPhotographer = photographerSelect.value;
-  const visibleFocused = photos.some((photo) => {
-    const matchesStatus = filter === 'all' || photo.status === filter;
-    const matchesPhotographer = selectedPhotographer === 'all' || photo.photographerId === selectedPhotographer;
-    return photo.id === focusedId && matchesStatus && matchesPhotographer;
-  });
-  if (!visibleFocused) focusedId = null;
-  render();
-});
-
-photoGrid.addEventListener('click', (event) => {
-  const card = event.target.closest('.photo-card');
-  if (!card) return;
-
-  const action = event.target.dataset.action;
-  const photo = photos.find((item) => item.id === card.dataset.id);
-  if (!photo) return;
-
-  if (action) {
-    photo.status = action;
-    if (action === 'selected') focusedId = photo.id;
-  } else {
-    focusPhoto(photo.id);
-  }
-  render();
-});
-
 latestByPhotographer.addEventListener('click', (event) => {
   const pagerButton = event.target.closest('[data-page-action]');
   if (pagerButton) {
     const folderId = pagerButton.dataset.folderId;
     const currentOffset = latestOffsets[folderId] || 0;
     latestOffsets[folderId] = pagerButton.dataset.pageAction === 'next'
-      ? currentOffset + 10
-      : Math.max(0, currentOffset - 10);
+      ? currentOffset + latestPageSize
+      : Math.max(0, currentOffset - latestPageSize);
     renderLatestByPhotographer();
     return;
   }
 
-  const button = event.target.closest('.latest-photo');
-  if (!button) return;
+  const card = event.target.closest('.latest-photo-card');
+  if (!card) return;
 
-  focusPhoto(button.dataset.id);
-  document.querySelector('#select')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-});
+  const photo = photos.find((item) => item.id === card.dataset.id);
+  if (!photo) return;
 
-document.querySelectorAll('.filter').forEach((button) => {
-  button.addEventListener('click', () => {
-    filter = button.dataset.filter;
-    document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('is-active', item === button));
-    render();
-  });
+  const action = event.target.dataset.action;
+  if (action) photo.status = action;
+  focusPhoto(photo.id, !action || action === 'selected');
 });
 
 addToQueue.addEventListener('click', () => {
