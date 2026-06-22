@@ -2,6 +2,7 @@ const driveFolderUrl = 'https://drive.google.com/drive/u/2/folders/1-qyygiLBAEwG
 const driveFolderId = '1-qyygiLBAEwG8_Po0dwhog-PgkVqfiWX';
 const instagramUrl = 'https://www.instagram.com/monoral_outdoor/';
 const driveScope = 'https://www.googleapis.com/auth/drive.readonly';
+const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.apps.googleusercontent.com';
 
 let photos = [];
 let photographerFolders = [];
@@ -31,7 +32,7 @@ const queueList = document.querySelector('#queueList');
 const addToQueue = document.querySelector('#addToQueue');
 const exportPlan = document.querySelector('#exportPlan');
 
-googleClientId.value = localStorage.getItem('instaha.googleClientId') || '';
+googleClientId.value = localStorage.getItem('instaha.googleClientId') || defaultGoogleClientId;
 instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || '';
 syncDrive.dataset.label = syncDrive.textContent.trim();
 
