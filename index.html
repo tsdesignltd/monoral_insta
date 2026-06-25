@@ -27,7 +27,7 @@
         <section class="account-card" aria-label="Instagram account">
           <p class="panel-label">投稿先</p>
           <a class="ig-account" href="https://www.instagram.com/monoral_outdoor/" target="_blank" rel="noreferrer">@monoral_outdoor</a>
-          <div class="status-pill">Meta API 接続待ち</div>
+          <div id="instagramConnectionPill" class="status-pill">Meta API 接続待ち</div>
         </section>
 
         <nav class="steps" aria-label="workflow">
@@ -67,7 +67,8 @@
             </div>
           </label>
           <div class="token-actions">
-            <a class="button-link" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">Metaでトークン取得</a>
+            <a class="button-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">Metaアプリを開く</a>
+            <button id="verifyInstagramConnection" type="button">Instagram接続確認</button>
             <button id="clearInstagramToken" type="button">保存トークンを削除</button>
           </div>
           <p id="instagramTokenStatus" class="token-status">トークンを入力すると、このブラウザに保存されます。</p>

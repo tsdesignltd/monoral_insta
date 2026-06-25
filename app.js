@@ -28,8 +28,10 @@ const googleClientId = document.querySelector('#googleClientId');
 const instagramBusinessId = document.querySelector('#instagramBusinessId');
 const instagramAccessToken = document.querySelector('#instagramAccessToken');
 const toggleInstagramToken = document.querySelector('#toggleInstagramToken');
+const verifyInstagramConnection = document.querySelector('#verifyInstagramConnection');
 const clearInstagramToken = document.querySelector('#clearInstagramToken');
 const instagramTokenStatus = document.querySelector('#instagramTokenStatus');
+const instagramConnectionPill = document.querySelector('#instagramConnectionPill');
 const syncStatus = document.querySelector('#syncStatus');
 const photographerSelect = document.querySelector('#photographerSelect');
 const latestByPhotographer = document.querySelector('#latestByPhotographer');
@@ -153,13 +155,20 @@ async function restoreDriveCatalogCache() {
 
 function updateInstagramTokenStatus(message) {
   const hasToken = Boolean(instagramAccessToken.value.trim());
-  instagramTokenStatus.textContent = message || (
-    hasToken
-      ? 'アクセストークンはこのブラウザに保存されています。'
-      : 'トークンを入力すると、このブラウザに保存されます。'
-  );
+  const isAppToken = hasToken && isMetaAppAccessToken(instagramAccessToken.value.trim());
+  instagramTokenStatus.textContent = message || (isAppToken
+    ? 'このトークンはアプリトークンのため投稿に使用できません。Instagramユーザートークンを取得してください。'
+    : hasToken
+      ? 'アクセストークンはこのブラウザに保存されています。接続確認を実行してください。'
+      : 'Instagramユーザートークンを入力すると、このブラウザに保存されます。');
   instagramTokenStatus.dataset.saved = String(hasToken);
+  instagramTokenStatus.dataset.invalid = String(isAppToken);
   clearInstagramToken.disabled = !hasToken;
+  verifyInstagramConnection.disabled = !hasToken || isAppToken;
+
+  if (!hasToken || isAppToken) {
+    setInstagramConnectionState(isAppToken ? 'アプリトークンは使用不可' : 'Meta API 接続待ち', isAppToken ? 'error' : 'idle');
+  }
 }
 
 function saveInstagramToken() {
@@ -172,6 +181,63 @@ function saveInstagramToken() {
   }
 
   updateInstagramTokenStatus();
+}
+
+function isMetaAppAccessToken(token) {
+  return /^\d+\|/.test(token);
+}
+
+function setInstagramConnectionState(message, tone = 'idle') {
+  instagramConnectionPill.textContent = message;
+  instagramConnectionPill.dataset.tone = tone;
+}
+
+async function fetchInstagramProfile(token) {
+  const requestProfile = async (fields) => {
+    const url = new URL(instagramGraphUrl('me'));
+    url.searchParams.set('fields', fields);
+    url.searchParams.set('access_token', token);
+    const response = await fetch(url);
+    const result = await response.json();
+    return { response, result };
+  };
+
+  let profileResponse = await requestProfile('user_id,username');
+  if (!profileResponse.response.ok && /field|user_id/i.test(profileResponse.result.error?.message || '')) {
+    profileResponse = await requestProfile('id,username');
+  }
+
+  if (!profileResponse.response.ok) {
+    throw new Error(profileResponse.result.error?.message || 'Instagramアカウント情報を取得できませんでした。');
+  }
+
+  const accountId = String(profileResponse.result.user_id || profileResponse.result.id || '').trim();
+  if (!accountId) {
+    throw new Error('Instagram Account IDを取得できませんでした。トークンの権限を確認してください。');
+  }
+
+  return {
+    accountId,
+    username: profileResponse.result.username || ''
+  };
+}
+
+async function verifyAndStoreInstagramConnection() {
+  const token = instagramAccessToken.value.trim();
+  if (!token) {
+    throw new Error('Instagramユーザーアクセストークンを入力してください。');
+  }
+  if (isMetaAppAccessToken(token)) {
+    throw new Error('アプリアクセストークンは投稿に使用できません。Instagram Loginで取得したユーザーアクセストークンが必要です。');
+  }
+
+  const profile = await fetchInstagramProfile(token);
+  instagramBusinessId.value = profile.accountId;
+  localStorage.setItem('insta.instagramBusinessId', profile.accountId);
+  localStorage.setItem(instagramTokenStorageKey, token);
+  setInstagramConnectionState(profile.username ? `@${profile.username} 接続済み` : 'Instagram 接続済み', 'success');
+  updateInstagramTokenStatus(`接続成功: ${profile.username ? `@${profile.username} / ` : ''}Account ID ${profile.accountId}`);
+  return profile;
 }
 
 function escapeHtml(value) {
@@ -218,15 +284,21 @@ function instagramGraphUrl(path) {
 }
 
 async function postToInstagram(item) {
-  const igUserId = instagramBusinessId.value.trim();
   const token = instagramAccessToken.value.trim();
 
-  if (!igUserId || !token) {
-    throw new Error('Instagram Account ID と Access Token を入力してください。');
+  if (!token) {
+    throw new Error('Instagramユーザーアクセストークンを入力してください。');
+  }
+  if (isMetaAppAccessToken(token)) {
+    throw new Error('アプリアクセストークンは投稿に使用できません。Instagramユーザーアクセストークンを取得してください。');
   }
 
+  const profile = await fetchInstagramProfile(token);
+  const igUserId = profile.accountId;
+  instagramBusinessId.value = igUserId;
   localStorage.setItem('insta.instagramBusinessId', igUserId);
   localStorage.setItem(instagramTokenStorageKey, token);
+  setInstagramConnectionState(profile.username ? `@${profile.username} 接続済み` : 'Instagram 接続済み', 'success');
 
   if (item.type !== 'フィード投稿') {
     throw new Error('現在の実投稿はフィード投稿のみ対応しています。リール/ストーリーズはMeta API設定を追加してください。');
@@ -764,6 +836,22 @@ syncDrive.addEventListener('click', syncDrivePhotos);
 
 instagramAccessToken.addEventListener('input', saveInstagramToken);
 
+verifyInstagramConnection.addEventListener('click', async () => {
+  verifyInstagramConnection.disabled = true;
+  verifyInstagramConnection.textContent = '確認中';
+  setInstagramConnectionState('接続確認中', 'loading');
+
+  try {
+    await verifyAndStoreInstagramConnection();
+  } catch (error) {
+    setInstagramConnectionState('Instagram 接続失敗', 'error');
+    updateInstagramTokenStatus(error.message || 'Instagram接続確認に失敗しました。');
+  } finally {
+    verifyInstagramConnection.textContent = 'Instagram接続確認';
+    verifyInstagramConnection.disabled = !instagramAccessToken.value.trim() || isMetaAppAccessToken(instagramAccessToken.value.trim());
+  }
+});
+
 toggleInstagramToken.addEventListener('click', () => {
   const shouldShow = instagramAccessToken.type === 'password';
   instagramAccessToken.type = shouldShow ? 'text' : 'password';
@@ -778,6 +866,7 @@ clearInstagramToken.addEventListener('click', () => {
   toggleInstagramToken.setAttribute('aria-label', 'アクセストークンを表示');
   localStorage.removeItem(instagramTokenStorageKey);
   updateInstagramTokenStatus('保存したアクセストークンを削除しました。');
+  setInstagramConnectionState('Meta API 接続待ち');
 });
 
 generateCaption.addEventListener('click', () => {

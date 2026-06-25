@@ -169,6 +169,21 @@ h3 {
   font-weight: 700;
 }
 
+.status-pill[data-tone="success"] {
+  border-color: rgba(158, 177, 143, 0.75);
+  color: #cfe0c4;
+}
+
+.status-pill[data-tone="loading"] {
+  border-color: rgba(226, 179, 95, 0.75);
+  color: #f5d590;
+}
+
+.status-pill[data-tone="error"] {
+  border-color: rgba(201, 149, 132, 0.8);
+  color: #efb9a8;
+}
+
 .steps {
   display: grid;
   gap: 8px;
@@ -248,6 +263,12 @@ h3 {
   border-color: #9eb18f;
   color: #3e5a36;
   background: #eef4ea;
+}
+
+.token-status[data-invalid="true"] {
+  border-color: #c99584;
+  color: #8a3f2d;
+  background: #f8ece8;
 }
 
 .sync-status {
