@@ -5,6 +5,8 @@ const driveScope = 'https://www.googleapis.com/auth/drive.readonly';
 const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.apps.googleusercontent.com';
 const defaultInstagramAccountId = '17841403518578706';
 const instagramTokenStorageKey = 'insta.instagramAccessToken';
+const latestPageSize = 30;
+const visiblePhotoGridRows = 3;
 
 let photos = [];
 let photographerFolders = [];
@@ -405,7 +407,7 @@ function renderLatestByPhotographer() {
   if (!photographerFolders.length) {
     latestByPhotographer.innerHTML = `
       <div class="empty-grid">
-        <strong>撮影者フォルダを同期すると、ここに最新10枚ずつ表示します。</strong>
+        <strong>撮影者フォルダを同期すると、ここに最新30枚ずつ表示します。</strong>
         <span>Drive直下の各サブフォルダを撮影者として読み込み、その中の写真を更新日時の新しい順に並べます。</span>
       </div>
     `;
@@ -416,12 +418,15 @@ function renderLatestByPhotographer() {
     const allFolderPhotos = photos
       .filter((photo) => photo.photographerId === folder.id)
       .sort(sortNewestFirst);
-    const offset = Math.min(latestOffsets[folder.id] || 0, Math.max(0, allFolderPhotos.length - 10));
-    const folderPhotos = allFolderPhotos.slice(offset, offset + 10);
+    const lastPageOffset = allFolderPhotos.length
+      ? Math.floor((allFolderPhotos.length - 1) / latestPageSize) * latestPageSize
+      : 0;
+    const offset = Math.min(latestOffsets[folder.id] || 0, lastPageOffset);
+    const folderPhotos = allFolderPhotos.slice(offset, offset + latestPageSize);
     const from = allFolderPhotos.length ? offset + 1 : 0;
-    const to = Math.min(offset + 10, allFolderPhotos.length);
+    const to = Math.min(offset + latestPageSize, allFolderPhotos.length);
     const canGoPrev = offset > 0;
-    const canGoNext = offset + 10 < allFolderPhotos.length;
+    const canGoNext = offset + latestPageSize < allFolderPhotos.length;
 
     const photoCells = folderPhotos.length ? folderPhotos.map((photo) => `
       <button class="latest-photo" type="button" data-id="${escapeHtml(photo.id)}" aria-label="${escapeHtml(`${folder.name} ${photo.name}`)}">
@@ -439,8 +444,8 @@ function renderLatestByPhotographer() {
             <span>${from}-${to} / ${allFolderPhotos.length}</span>
           </div>
           <div class="latest-pager" aria-label="${escapeHtml(folder.name)} latest pager">
-            <button type="button" data-page-action="prev" data-folder-id="${escapeHtml(folder.id)}" ${canGoPrev ? '' : 'disabled'}>前の10枚</button>
-            <button type="button" data-page-action="next" data-folder-id="${escapeHtml(folder.id)}" ${canGoNext ? '' : 'disabled'}>次の10枚</button>
+            <button type="button" data-page-action="prev" data-folder-id="${escapeHtml(folder.id)}" ${canGoPrev ? '' : 'disabled'}>前の30枚</button>
+            <button type="button" data-page-action="next" data-folder-id="${escapeHtml(folder.id)}" ${canGoNext ? '' : 'disabled'}>次の30枚</button>
           </div>
         </div>
         <div class="latest-strip">${photoCells}</div>
@@ -529,6 +534,28 @@ function render() {
     </article>
   `;
   }).join('') : '<p class="empty-queue">採用した写真を選び、投稿案をキューに追加してください。</p>';
+
+  window.requestAnimationFrame(updatePhotoGridHeight);
+}
+
+function updatePhotoGridHeight() {
+  const cards = photoGrid.querySelectorAll('.photo-card');
+  if (!cards.length) {
+    photoGrid.style.removeProperty('max-height');
+    return;
+  }
+
+  const gridStyle = window.getComputedStyle(photoGrid);
+  const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+  const paddingTop = Number.parseFloat(gridStyle.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(gridStyle.paddingBottom) || 0;
+  const cardHeight = cards[0].getBoundingClientRect().height;
+  const maxHeight = (cardHeight * visiblePhotoGridRows)
+    + (rowGap * (visiblePhotoGridRows - 1))
+    + paddingTop
+    + paddingBottom;
+
+  photoGrid.style.maxHeight = `${Math.ceil(maxHeight)}px`;
 }
 
 function focusPhoto(id) {
@@ -600,8 +627,8 @@ latestByPhotographer.addEventListener('click', (event) => {
     const folderId = pagerButton.dataset.folderId;
     const currentOffset = latestOffsets[folderId] || 0;
     latestOffsets[folderId] = pagerButton.dataset.pageAction === 'next'
-      ? currentOffset + 10
-      : Math.max(0, currentOffset - 10);
+      ? currentOffset + latestPageSize
+      : Math.max(0, currentOffset - latestPageSize);
     renderLatestByPhotographer();
     return;
   }
@@ -689,6 +716,8 @@ exportPlan.addEventListener('click', () => {
   link.click();
   URL.revokeObjectURL(url);
 });
+
+window.addEventListener('resize', updatePhotoGridHeight);
 
 updateInstagramTokenStatus();
 render();

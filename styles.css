@@ -446,11 +446,12 @@ button.is-loading::before {
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  align-items: stretch;
   gap: 12px;
   padding: 18px;
-  max-height: 1020px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .latest-section {
@@ -579,6 +580,8 @@ button.is-loading::before {
 
 .photo-card {
   position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
   min-width: 0;
   border: 1px solid var(--line);
   background: var(--panel);
@@ -599,6 +602,7 @@ button.is-loading::before {
 
 .photo-body {
   display: grid;
+  align-content: start;
   gap: 7px;
   padding: 9px;
 }
@@ -847,19 +851,27 @@ textarea {
 }
 
 @media (max-width: 1040px) {
-  .app-shell,
-  .main-grid {
+  .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .sidebar,
-  .composer {
+  .sidebar {
     position: static;
     height: auto;
   }
 
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .composer {
+    position: static;
   }
 }
 
