@@ -4,6 +4,7 @@ const instagramUrl = 'https://www.instagram.com/monoral_outdoor/';
 const driveScope = 'https://www.googleapis.com/auth/drive.readonly';
 const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.apps.googleusercontent.com';
 const defaultInstagramAccountId = '17841403518578706';
+const instagramTokenStorageKey = 'insta.instagramAccessToken';
 
 let photos = [];
 let photographerFolders = [];
@@ -19,6 +20,9 @@ const syncDrive = document.querySelector('#syncDrive');
 const googleClientId = document.querySelector('#googleClientId');
 const instagramBusinessId = document.querySelector('#instagramBusinessId');
 const instagramAccessToken = document.querySelector('#instagramAccessToken');
+const toggleInstagramToken = document.querySelector('#toggleInstagramToken');
+const clearInstagramToken = document.querySelector('#clearInstagramToken');
+const instagramTokenStatus = document.querySelector('#instagramTokenStatus');
 const syncStatus = document.querySelector('#syncStatus');
 const photographerSelect = document.querySelector('#photographerSelect');
 const latestByPhotographer = document.querySelector('#latestByPhotographer');
@@ -35,7 +39,31 @@ const exportPlan = document.querySelector('#exportPlan');
 
 googleClientId.value = localStorage.getItem('instaha.googleClientId') || defaultGoogleClientId;
 instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || defaultInstagramAccountId;
+instagramAccessToken.value = localStorage.getItem(instagramTokenStorageKey) || '';
 syncDrive.dataset.label = syncDrive.textContent.trim();
+
+function updateInstagramTokenStatus(message) {
+  const hasToken = Boolean(instagramAccessToken.value.trim());
+  instagramTokenStatus.textContent = message || (
+    hasToken
+      ? 'アクセストークンはこのブラウザに保存されています。'
+      : 'トークンを入力すると、このブラウザに保存されます。'
+  );
+  instagramTokenStatus.dataset.saved = String(hasToken);
+  clearInstagramToken.disabled = !hasToken;
+}
+
+function saveInstagramToken() {
+  const token = instagramAccessToken.value.trim();
+
+  if (token) {
+    localStorage.setItem(instagramTokenStorageKey, token);
+  } else {
+    localStorage.removeItem(instagramTokenStorageKey);
+  }
+
+  updateInstagramTokenStatus();
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -89,6 +117,7 @@ async function postToInstagram(item) {
   }
 
   localStorage.setItem('insta.instagramBusinessId', igUserId);
+  localStorage.setItem(instagramTokenStorageKey, token);
 
   if (item.type !== 'フィード投稿') {
     throw new Error('現在の実投稿はフィード投稿のみ対応しています。リール/ストーリーズはMeta API設定を追加してください。');
@@ -511,6 +540,24 @@ function focusPhoto(id) {
 
 syncDrive.addEventListener('click', syncDrivePhotos);
 
+instagramAccessToken.addEventListener('input', saveInstagramToken);
+
+toggleInstagramToken.addEventListener('click', () => {
+  const shouldShow = instagramAccessToken.type === 'password';
+  instagramAccessToken.type = shouldShow ? 'text' : 'password';
+  toggleInstagramToken.textContent = shouldShow ? '隠す' : '表示';
+  toggleInstagramToken.setAttribute('aria-label', shouldShow ? 'アクセストークンを隠す' : 'アクセストークンを表示');
+});
+
+clearInstagramToken.addEventListener('click', () => {
+  instagramAccessToken.value = '';
+  instagramAccessToken.type = 'password';
+  toggleInstagramToken.textContent = '表示';
+  toggleInstagramToken.setAttribute('aria-label', 'アクセストークンを表示');
+  localStorage.removeItem(instagramTokenStorageKey);
+  updateInstagramTokenStatus('保存したアクセストークンを削除しました。');
+});
+
 generateCaption.addEventListener('click', () => {
   const focused = photos.find((photo) => photo.id === focusedId);
   if (!focused) return;
@@ -643,4 +690,5 @@ exportPlan.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+updateInstagramTokenStatus();
 render();

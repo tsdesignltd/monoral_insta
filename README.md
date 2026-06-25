@@ -59,6 +59,10 @@ Required:
 - `instagram_business_content_publish` を含むAccess Token
 - Meta側から取得できる公開画像URL
 
+画面の `Metaでトークン取得` からMeta Graph API Explorerを開き、対象のMetaアプリとInstagramアカウントを選択して、`instagram_business_content_publish` を含むトークンを生成します。取得したトークンをアプリへ貼り付けると、同じブラウザのローカルストレージに保存され、次回起動時に復元されます。
+
+保存トークンは同じブラウザプロフィールを利用できる人から参照できるため、共有PCでは `保存トークンを削除` を使用してください。Client Secretを必要とするOAuthコード交換は静的Webアプリ内では安全に実行できないため、完全な自動取得にはバックエンドまたはサーバーレス関数が必要です。
+
 Drive画像が非公開、またはHEICなどGraph APIが受け付けない形式の場合、投稿は失敗します。その場合はキュー内にエラーを表示します。
 
 ## Current Scope

@@ -61,8 +61,16 @@
           </label>
           <label>
             Instagram API Access Token
-            <input id="instagramAccessToken" type="password" autocomplete="off" placeholder="投稿時のみ使用">
+            <div class="token-field">
+              <input id="instagramAccessToken" type="password" autocomplete="off" placeholder="Metaで取得したトークンを貼り付け">
+              <button id="toggleInstagramToken" type="button" class="token-control" aria-label="アクセストークンを表示">表示</button>
+            </div>
           </label>
+          <div class="token-actions">
+            <a class="button-link" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">Metaでトークン取得</a>
+            <button id="clearInstagramToken" type="button">保存トークンを削除</button>
+          </div>
+          <p id="instagramTokenStatus" class="token-status">トークンを入力すると、このブラウザに保存されます。</p>
           <p id="syncStatus" class="sync-status">Client IDを入力してDrive同期を押してください。</p>
         </section>
 

@@ -203,13 +203,47 @@ h3 {
 
 .settings-panel {
   display: grid;
-  grid-template-columns: minmax(260px, 440px) minmax(220px, 1fr);
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
   gap: 14px;
   align-items: end;
   margin: 24px 0 0;
   padding: 16px;
   border: 1px solid var(--line);
   background: #fff;
+}
+
+.token-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.token-field input {
+  min-width: 0;
+}
+
+.token-control {
+  border-left: 0;
+}
+
+.token-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.token-status {
+  min-height: 40px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.token-status[data-saved="true"] {
+  border-color: #9eb18f;
+  color: #3e5a36;
+  background: #eef4ea;
 }
 
 .sync-status {
