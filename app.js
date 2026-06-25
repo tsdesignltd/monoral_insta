@@ -5,6 +5,10 @@ const driveScope = 'https://www.googleapis.com/auth/drive.readonly';
 const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.apps.googleusercontent.com';
 const defaultInstagramAccountId = '17841403518578706';
 const instagramTokenStorageKey = 'insta.instagramAccessToken';
+const queueStorageKey = 'insta.approvalQueue';
+const driveCacheDatabaseName = 'monoral-insta-cache';
+const driveCacheStoreName = 'drive-catalog';
+const driveCacheRecordKey = 'current';
 const latestPageSize = 30;
 const visiblePhotoGridRows = 3;
 
@@ -13,10 +17,11 @@ let photographerFolders = [];
 let focusedId = null;
 let filter = 'all';
 let selectedPhotographer = 'all';
-let queue = [];
+let queue = loadStoredQueue();
 let tokenClient = null;
 let accessToken = '';
 let latestOffsets = {};
+let driveCacheSaveTimer = null;
 
 const syncDrive = document.querySelector('#syncDrive');
 const googleClientId = document.querySelector('#googleClientId');
@@ -35,6 +40,9 @@ const caption = document.querySelector('#caption');
 const generateCaption = document.querySelector('#generateCaption');
 const hashtags = document.querySelector('#hashtags');
 const postType = document.querySelector('#postType');
+const publishTiming = document.querySelector('#publishTiming');
+const scheduledAtField = document.querySelector('#scheduledAtField');
+const scheduledAt = document.querySelector('#scheduledAt');
 const queueList = document.querySelector('#queueList');
 const addToQueue = document.querySelector('#addToQueue');
 const exportPlan = document.querySelector('#exportPlan');
@@ -43,6 +51,108 @@ googleClientId.value = localStorage.getItem('instaha.googleClientId') || default
 instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || defaultInstagramAccountId;
 instagramAccessToken.value = localStorage.getItem(instagramTokenStorageKey) || '';
 syncDrive.dataset.label = syncDrive.textContent.trim();
+
+function loadStoredQueue() {
+  try {
+    const storedQueue = JSON.parse(localStorage.getItem(queueStorageKey) || '[]');
+    if (!Array.isArray(storedQueue)) return [];
+
+    return storedQueue.map((item) => ({
+      ...item,
+      status: item.status === 'posting' ? 'failed' : item.status,
+      error: item.status === 'posting' ? '投稿処理が中断されました。再度実行してください。' : item.error
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function saveQueue() {
+  localStorage.setItem(queueStorageKey, JSON.stringify(queue));
+}
+
+function openDriveCacheDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(driveCacheDatabaseName, 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(driveCacheStoreName)) {
+        database.createObjectStore(driveCacheStoreName);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readDriveCatalogCache() {
+  const database = await openDriveCacheDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(driveCacheStoreName, 'readonly');
+    const request = transaction.objectStore(driveCacheStoreName).get(driveCacheRecordKey);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => database.close();
+  });
+}
+
+async function writeDriveCatalogCache() {
+  const database = await openDriveCacheDatabase();
+  const catalog = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    driveFolderId,
+    photographerFolders,
+    photos
+  };
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(driveCacheStoreName, 'readwrite');
+    transaction.objectStore(driveCacheStoreName).put(catalog, driveCacheRecordKey);
+
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+function scheduleDriveCatalogSave() {
+  window.clearTimeout(driveCacheSaveTimer);
+  driveCacheSaveTimer = window.setTimeout(() => {
+    writeDriveCatalogCache().catch(() => {
+      setSyncStatus('写真キャッシュの保存に失敗しました。Drive同期を再実行してください。', 'error');
+    });
+  }, 250);
+}
+
+async function restoreDriveCatalogCache() {
+  try {
+    const catalog = await readDriveCatalogCache();
+    if (!catalog || catalog.driveFolderId !== driveFolderId) return;
+
+    photographerFolders = Array.isArray(catalog.photographerFolders) ? catalog.photographerFolders : [];
+    photos = Array.isArray(catalog.photos) ? catalog.photos.sort(sortNewestFirst) : [];
+    focusedId = photos[0]?.id || null;
+    selectedPhotographer = 'all';
+    latestOffsets = {};
+
+    if (photos.length || photographerFolders.length) {
+      const savedAt = catalog.savedAt ? formatScheduledAt(catalog.savedAt) : '';
+      setSyncStatus(`前回キャッシュを表示中: 写真${photos.length}枚${savedAt ? `（${savedAt}保存）` : ''}`, 'cached');
+      render();
+    }
+  } catch {
+    setSyncStatus('写真キャッシュを読み込めませんでした。Drive差分同期で再取得してください。', 'error');
+  }
+}
 
 function updateInstagramTokenStatus(message) {
   const hasToken = Boolean(instagramAccessToken.value.trim());
@@ -309,7 +419,7 @@ async function listImagesUnderFolder(folder, photographer, folderPath, visitedFo
 
 async function syncDrivePhotos() {
   setBusy(true);
-  setSyncStatus('Google認証を開始しています...', 'loading');
+  setSyncStatus(photos.length ? 'キャッシュとの差分を確認しています...' : 'Google認証を開始しています...', 'loading');
 
   try {
     await getAccessToken();
@@ -322,7 +432,7 @@ async function syncDrivePhotos() {
       orderBy: 'name'
     });
 
-    photographerFolders = folders.map((folder) => ({
+    const nextPhotographerFolders = folders.map((folder) => ({
       id: folder.id,
       name: folder.name,
       modifiedTime: folder.modifiedTime,
@@ -330,20 +440,59 @@ async function syncDrivePhotos() {
       webViewLink: folder.webViewLink
     }));
 
-    setSyncStatus(`撮影者${photographerFolders.length}件のサブフォルダ内写真を読み込んでいます...`, 'loading');
+    setSyncStatus(`撮影者${nextPhotographerFolders.length}件の差分を確認しています...`, 'loading');
 
     const allPhotos = [];
-    for (const [index, folder] of photographerFolders.entries()) {
-      setSyncStatus(`${index + 1}/${photographerFolders.length}: ${folder.name} のサブフォルダ内写真を読み込んでいます...`, 'loading');
+    for (const [index, folder] of nextPhotographerFolders.entries()) {
+      setSyncStatus(`${index + 1}/${nextPhotographerFolders.length}: ${folder.name} の差分を確認しています...`, 'loading');
       const folderPhotos = await listImagesUnderFolder(folder, folder, folder.name);
       allPhotos.push(...folderPhotos);
     }
 
-    photos = allPhotos.sort(sortNewestFirst);
+    const cachedPhotosById = new Map(photos.map((photo) => [photo.id, photo]));
+    let addedCount = 0;
+    let updatedCount = 0;
+    let unchangedCount = 0;
+
+    const nextPhotos = allPhotos.map((photo) => {
+      const cachedPhoto = cachedPhotosById.get(photo.id);
+      if (!cachedPhoto) {
+        addedCount += 1;
+        return photo;
+      }
+
+      const hasChanged = cachedPhoto.modifiedTime !== photo.modifiedTime
+        || cachedPhoto.name !== photo.name
+        || cachedPhoto.folderPath !== photo.folderPath
+        || cachedPhoto.photographerId !== photo.photographerId;
+
+      if (hasChanged) {
+        updatedCount += 1;
+      } else {
+        unchangedCount += 1;
+      }
+
+      return {
+        ...photo,
+        score: cachedPhoto.score ?? photo.score,
+        status: cachedPhoto.status || photo.status,
+        angle: cachedPhoto.angle || photo.angle
+      };
+    });
+
+    const nextPhotoIds = new Set(nextPhotos.map((photo) => photo.id));
+    const deletedCount = photos.filter((photo) => !nextPhotoIds.has(photo.id)).length;
+
+    photographerFolders = nextPhotographerFolders;
+    photos = nextPhotos.sort(sortNewestFirst);
     selectedPhotographer = 'all';
     latestOffsets = {};
-    focusedId = photos[0]?.id || null;
-    setSyncStatus(`同期完了: 撮影者${photographerFolders.length}件、写真${photos.length}枚`, 'success');
+    focusedId = photos.some((photo) => photo.id === focusedId) ? focusedId : (photos[0]?.id || null);
+    await writeDriveCatalogCache();
+    setSyncStatus(
+      `差分同期完了: 新規${addedCount}枚・更新${updatedCount}枚・削除${deletedCount}枚・変更なし${unchangedCount}枚`,
+      'success'
+    );
     render();
   } catch (error) {
     setSyncStatus(error.message || 'Drive同期に失敗しました。', 'error');
@@ -395,6 +544,38 @@ function generateMonoralCaption(photo) {
 
 function defaultHashtags() {
   return '#monoral #焚き火台 #ミニマルキャンプ #軽量焚き火台 #microcamping #ワイヤフレーム #wireflame';
+}
+
+function localDateTimeValue(date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function formatScheduledAt(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function updatePublishTimingFields() {
+  const isScheduled = publishTiming.value === 'scheduled';
+  scheduledAtField.hidden = !isScheduled;
+
+  const minimumDate = new Date(Date.now() + 60_000);
+  scheduledAt.min = localDateTimeValue(minimumDate);
+  if (isScheduled && !scheduledAt.value) {
+    scheduledAt.value = localDateTimeValue(new Date(Date.now() + 10 * 60_000));
+  }
+
+  addToQueue.textContent = isScheduled ? '予約キューへ追加' : 'すぐに投稿';
 }
 
 function sortNewestFirst(photoA, photoB) {
@@ -517,18 +698,31 @@ function render() {
     const isPosted = item.status === 'posted';
     const isPosting = item.status === 'posting';
     const isFailed = item.status === 'failed';
-    const stateText = isPosted ? '投稿済み' : isPosting ? '投稿中' : isFailed ? '投稿失敗' : '承認待ち';
+    const isScheduled = item.status === 'scheduled';
+    const stateText = isPosted
+      ? '投稿済み'
+      : isPosting
+        ? '投稿中'
+        : isFailed
+          ? '投稿失敗'
+          : isScheduled
+            ? '予約済み'
+            : '投稿待ち';
+    const timingText = item.publishTiming === 'scheduled' && item.scheduledAt
+      ? `投稿予定: ${formatScheduledAt(item.scheduledAt)}`
+      : '投稿タイミング: すぐに投稿';
     return `
     <article class="queue-item" data-queue-id="${escapeHtml(item.id)}">
       <img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.name)}">
       <div>
         <h4>${escapeHtml(item.name)}</h4>
         <p>${escapeHtml(item.photographerName || '撮影者未設定')} / ${escapeHtml(item.type)} / ${escapeHtml(item.caption.slice(0, 48))}...</p>
+        <p class="queue-timing">${escapeHtml(timingText)}</p>
         ${item.error ? `<p class="queue-error">${escapeHtml(item.error)}</p>` : ''}
       </div>
       <div class="queue-actions">
-        <span class="queue-state ${isPosted ? 'is-posted' : ''} ${isPosting ? 'is-posting' : ''} ${isFailed ? 'is-failed' : ''}">${stateText}</span>
-        <button type="button" data-queue-action="post" ${isPosted || isPosting ? 'disabled' : ''}>${isPosting ? '投稿中' : '投稿'}</button>
+        <span class="queue-state ${isPosted ? 'is-posted' : ''} ${isPosting ? 'is-posting' : ''} ${isFailed ? 'is-failed' : ''} ${isScheduled ? 'is-scheduled' : ''}">${stateText}</span>
+        <button type="button" data-queue-action="post" ${isPosted || isPosting ? 'disabled' : ''}>${isPosting ? '投稿中' : '今すぐ投稿'}</button>
         <button type="button" data-queue-action="delete" class="danger-action">削除</button>
       </div>
     </article>
@@ -561,7 +755,10 @@ function updatePhotoGridHeight() {
 function focusPhoto(id) {
   focusedId = id;
   const focused = photos.find((photo) => photo.id === focusedId);
-  if (focused && focused.status !== 'selected') focused.status = 'selected';
+  if (focused && focused.status !== 'selected') {
+    focused.status = 'selected';
+    scheduleDriveCatalogSave();
+  }
   render();
 }
 
@@ -615,6 +812,7 @@ photoGrid.addEventListener('click', (event) => {
   if (action) {
     photo.status = action;
     if (action === 'selected') focusedId = photo.id;
+    scheduleDriveCatalogSave();
   } else {
     focusPhoto(photo.id);
   }
@@ -648,30 +846,83 @@ document.querySelectorAll('.filter').forEach((button) => {
   });
 });
 
-addToQueue.addEventListener('click', () => {
+publishTiming.addEventListener('change', updatePublishTimingFields);
+
+async function processQueueItem(item) {
+  if (!item || item.status === 'posted' || item.status === 'posting') return;
+
+  item.status = 'posting';
+  item.error = '';
+  saveQueue();
+  render();
+
+  try {
+    const result = await postToInstagram(item);
+    item.status = 'posted';
+    item.postedAt = new Date().toISOString();
+    item.instagramMediaId = result.mediaId;
+    item.instagramCreationId = result.creationId;
+  } catch (error) {
+    item.status = 'failed';
+    item.error = error.message || 'Instagram投稿に失敗しました。';
+  }
+
+  saveQueue();
+  render();
+}
+
+async function runScheduledQueue() {
+  const dueItems = queue.filter((item) => (
+    item.status === 'scheduled'
+    && item.scheduledAt
+    && new Date(item.scheduledAt).getTime() <= Date.now()
+  ));
+
+  for (const item of dueItems) {
+    await processQueueItem(item);
+  }
+}
+
+addToQueue.addEventListener('click', async () => {
   const focused = photos.find((photo) => photo.id === focusedId);
   if (!focused) return;
 
+  const isScheduled = publishTiming.value === 'scheduled';
+  const scheduledDate = isScheduled ? new Date(scheduledAt.value) : null;
+  if (isScheduled && (!scheduledAt.value || Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now())) {
+    window.alert('現在より後の投稿日時を指定してください。');
+    return;
+  }
+
+  const queueItem = {
+    id: `queue-${Date.now()}`,
+    sourceId: focused.id,
+    name: focused.name,
+    src: focused.src,
+    photographerId: focused.photographerId,
+    photographerName: focused.photographerName,
+    type: postType.value,
+    caption: caption.value,
+    hashtags: hashtags.value,
+    instagramUrl,
+    driveFolderUrl,
+    originalUrl: focused.originalUrl,
+    publishImageUrl: focused.publishImageUrl,
+    publishTiming: isScheduled ? 'scheduled' : 'now',
+    scheduledAt: isScheduled ? scheduledDate.toISOString() : null,
+    status: isScheduled ? 'scheduled' : 'pending'
+  };
+
   queue = [
-    {
-      id: `queue-${Date.now()}`,
-      sourceId: focused.id,
-      name: focused.name,
-      src: focused.src,
-      photographerId: focused.photographerId,
-      photographerName: focused.photographerName,
-      type: postType.value,
-      caption: caption.value,
-      hashtags: hashtags.value,
-      instagramUrl,
-      driveFolderUrl,
-      originalUrl: focused.originalUrl,
-      publishImageUrl: focused.publishImageUrl,
-      status: 'pending_approval'
-    },
+    queueItem,
     ...queue
   ];
+  saveQueue();
   render();
+
+  if (!isScheduled) {
+    await processQueueItem(queueItem);
+  }
 });
 
 queueList.addEventListener('click', async (event) => {
@@ -684,26 +935,15 @@ queueList.addEventListener('click', async (event) => {
 
   if (actionButton.dataset.queueAction === 'delete') {
     queue = queue.filter((entry) => entry.id !== item.id);
+    saveQueue();
     render();
     return;
   }
 
   if (actionButton.dataset.queueAction === 'post') {
-    item.status = 'posting';
-    item.error = '';
-    render();
-
-    try {
-      const result = await postToInstagram(item);
-      item.status = 'posted';
-      item.postedAt = new Date().toISOString();
-      item.instagramMediaId = result.mediaId;
-      item.instagramCreationId = result.creationId;
-    } catch (error) {
-      item.status = 'failed';
-      item.error = error.message || 'Instagram投稿に失敗しました。';
-    }
-    render();
+    item.publishTiming = 'now';
+    item.scheduledAt = null;
+    await processQueueItem(item);
   }
 });
 
@@ -718,6 +958,11 @@ exportPlan.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', updatePhotoGridHeight);
+window.addEventListener('focus', runScheduledQueue);
+window.setInterval(runScheduledQueue, 30_000);
 
 updateInstagramTokenStatus();
+updatePublishTimingFields();
 render();
+restoreDriveCatalogCache();
+runScheduledQueue();

@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   color: var(--ink);
@@ -280,6 +284,12 @@ h3 {
   border-color: #9eb18f;
   color: #3e5a36;
   background: #eef4ea;
+}
+
+.sync-status[data-tone="cached"] {
+  border-color: #9db7c2;
+  color: #355160;
+  background: #edf4f6;
 }
 
 .sync-status[data-tone="error"] {
@@ -729,7 +739,8 @@ label {
 
 select,
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="datetime-local"] {
   width: 100%;
   border: 1px solid var(--line);
   background: #fff;
@@ -739,6 +750,13 @@ input[type="text"] {
 
 textarea {
   resize: vertical;
+}
+
+.schedule-note {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .primary-action {
@@ -821,6 +839,18 @@ textarea {
 .queue-state.is-failed {
   background: #f8ece8;
   color: #8a3f2d;
+}
+
+.queue-state.is-scheduled {
+  background: #eee9f6;
+  color: #594174;
+}
+
+.queue-timing {
+  margin-top: 5px !important;
+  color: #594174 !important;
+  font-size: 0.78rem !important;
+  font-weight: 800;
 }
 
 .queue-error {
