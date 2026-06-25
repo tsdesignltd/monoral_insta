@@ -885,6 +885,33 @@ textarea {
   font-size: 0.78rem;
 }
 
+.queue-photographer-tag {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  margin-top: 10px;
+  color: #355160;
+  cursor: pointer;
+}
+
+.queue-photographer-tag input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--moss);
+}
+
+.queue-photographer-tag strong {
+  color: var(--ink);
+}
+
+.queue-tag-unavailable {
+  margin-top: 8px !important;
+  color: #8a9188 !important;
+  font-size: 0.75rem !important;
+}
+
 .queue-error {
   margin-top: 6px !important;
   color: #8a3f2d !important;

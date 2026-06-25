@@ -11,6 +11,12 @@ const driveCacheStoreName = 'drive-catalog';
 const driveCacheRecordKey = 'current';
 const latestPageSize = 30;
 const visiblePhotoGridRows = 3;
+const photographerInstagramAccounts = new Map([
+  ['松下雄一', 'yuich1hz_lc78tc'],
+  ['吉田佳弘', 'yoshiyoshi_99'],
+  ['内藤珠魅', 'tamalyngo'],
+  ['野上優里奈', 'yuri_camplife']
+]);
 
 let photos = [];
 let photographerFolders = [];
@@ -56,11 +62,19 @@ function loadStoredQueue() {
     const storedQueue = JSON.parse(localStorage.getItem(queueStorageKey) || '[]');
     if (!Array.isArray(storedQueue)) return [];
 
-    return storedQueue.map((item) => ({
-      ...item,
-      status: item.status === 'posting' ? 'failed' : item.status,
-      error: item.status === 'posting' ? '投稿処理が中断されました。再度実行してください。' : item.error
-    }));
+    return storedQueue.map((item) => {
+      const photographerInstagram = item.photographerInstagram
+        || getPhotographerInstagram(item.photographerName);
+      return {
+        ...item,
+        photographerInstagram,
+        tagPhotographer: typeof item.tagPhotographer === 'boolean'
+          ? item.tagPhotographer
+          : Boolean(photographerInstagram),
+        status: item.status === 'posting' ? 'failed' : item.status,
+        error: item.status === 'posting' ? '投稿処理が中断されました。再度実行してください。' : item.error
+      };
+    });
   } catch {
     return [];
   }
@@ -249,6 +263,16 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
+function normalizePhotographerName(name) {
+  return String(name || '')
+    .replace(/[\s\u3000]/g, '')
+    .replace(/(さん|様)$/u, '');
+}
+
+function getPhotographerInstagram(name) {
+  return photographerInstagramAccounts.get(normalizePhotographerName(name)) || '';
+}
+
 function setSyncStatus(message, tone = 'muted') {
   syncStatus.textContent = message;
   syncStatus.dataset.tone = tone;
@@ -315,6 +339,14 @@ async function postToInstagram(item) {
     caption: captionText,
     access_token: token
   });
+
+  if (item.tagPhotographer && item.photographerInstagram) {
+    createParams.set('user_tags', JSON.stringify([{
+      username: item.photographerInstagram,
+      x: 0.5,
+      y: 0.5
+    }]));
+  }
 
   const createResponse = await fetch(instagramGraphUrl(`${encodeURIComponent(igUserId)}/media`), {
     method: 'POST',
@@ -756,6 +788,8 @@ function render() {
     const isFailed = item.status === 'failed';
     const isScheduled = item.status === 'scheduled';
     const timing = item.publishTiming === 'scheduled' ? 'scheduled' : 'now';
+    const photographerInstagram = item.photographerInstagram
+      || getPhotographerInstagram(item.photographerName);
     const scheduledValue = item.scheduledAt
       ? localDateTimeValue(new Date(item.scheduledAt))
       : localDateTimeValue(new Date(Date.now() + 10 * 60_000));
@@ -787,6 +821,12 @@ function render() {
             <input type="datetime-local" data-queue-scheduled-at value="${escapeHtml(scheduledValue)}" min="${escapeHtml(localDateTimeValue(new Date(Date.now() + 60_000)))}" ${isPosted || isPosting ? 'disabled' : ''}>
           </label>
         </div>
+        ${photographerInstagram ? `
+          <label class="queue-photographer-tag">
+            <input type="checkbox" data-queue-photographer-tag ${item.tagPhotographer !== false ? 'checked' : ''} ${isPosted || isPosting ? 'disabled' : ''}>
+            <span>撮影者 <strong>@${escapeHtml(photographerInstagram)}</strong> を写真にタグ付け</span>
+          </label>
+        ` : '<p class="queue-tag-unavailable">撮影者のInstagramアカウント登録なし</p>'}
         ${timing === 'scheduled' && item.scheduledAt ? `<p class="queue-timing">投稿予定: ${escapeHtml(formatScheduledAt(item.scheduledAt))}</p>` : ''}
         ${item.error ? `<p class="queue-error">${escapeHtml(item.error)}</p>` : ''}
       </div>
@@ -979,6 +1019,8 @@ addToQueue.addEventListener('click', () => {
     src: focused.src,
     photographerId: focused.photographerId,
     photographerName: focused.photographerName,
+    photographerInstagram: getPhotographerInstagram(focused.photographerName),
+    tagPhotographer: Boolean(getPhotographerInstagram(focused.photographerName)),
     type: postType.value,
     caption: caption.value,
     hashtags: hashtags.value,
@@ -1033,6 +1075,12 @@ queueList.addEventListener('change', (event) => {
     item.scheduledAt = scheduledDate.toISOString();
     item.status = 'scheduled';
     item.error = '';
+  }
+
+  if (event.target.matches('[data-queue-photographer-tag]')) {
+    item.photographerInstagram = item.photographerInstagram
+      || getPhotographerInstagram(item.photographerName);
+    item.tagPhotographer = event.target.checked;
   }
 
   saveQueue();
