@@ -40,9 +40,6 @@ const caption = document.querySelector('#caption');
 const generateCaption = document.querySelector('#generateCaption');
 const hashtags = document.querySelector('#hashtags');
 const postType = document.querySelector('#postType');
-const publishTiming = document.querySelector('#publishTiming');
-const scheduledAtField = document.querySelector('#scheduledAtField');
-const scheduledAt = document.querySelector('#scheduledAt');
 const queueList = document.querySelector('#queueList');
 const addToQueue = document.querySelector('#addToQueue');
 const exportPlan = document.querySelector('#exportPlan');
@@ -565,19 +562,6 @@ function formatScheduledAt(value) {
   }).format(date);
 }
 
-function updatePublishTimingFields() {
-  const isScheduled = publishTiming.value === 'scheduled';
-  scheduledAtField.hidden = !isScheduled;
-
-  const minimumDate = new Date(Date.now() + 60_000);
-  scheduledAt.min = localDateTimeValue(minimumDate);
-  if (isScheduled && !scheduledAt.value) {
-    scheduledAt.value = localDateTimeValue(new Date(Date.now() + 10 * 60_000));
-  }
-
-  addToQueue.textContent = isScheduled ? '予約キューへ追加' : 'すぐに投稿';
-}
-
 function sortNewestFirst(photoA, photoB) {
   const timeA = new Date(photoA.modifiedTime || photoA.createdTime || 0).getTime();
   const timeB = new Date(photoB.modifiedTime || photoB.createdTime || 0).getTime();
@@ -699,6 +683,10 @@ function render() {
     const isPosting = item.status === 'posting';
     const isFailed = item.status === 'failed';
     const isScheduled = item.status === 'scheduled';
+    const timing = item.publishTiming === 'scheduled' ? 'scheduled' : 'now';
+    const scheduledValue = item.scheduledAt
+      ? localDateTimeValue(new Date(item.scheduledAt))
+      : localDateTimeValue(new Date(Date.now() + 10 * 60_000));
     const stateText = isPosted
       ? '投稿済み'
       : isPosting
@@ -708,16 +696,26 @@ function render() {
           : isScheduled
             ? '予約済み'
             : '投稿待ち';
-    const timingText = item.publishTiming === 'scheduled' && item.scheduledAt
-      ? `投稿予定: ${formatScheduledAt(item.scheduledAt)}`
-      : '投稿タイミング: すぐに投稿';
     return `
     <article class="queue-item" data-queue-id="${escapeHtml(item.id)}">
       <img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.name)}">
       <div>
         <h4>${escapeHtml(item.name)}</h4>
         <p>${escapeHtml(item.photographerName || '撮影者未設定')} / ${escapeHtml(item.type)} / ${escapeHtml(item.caption.slice(0, 48))}...</p>
-        <p class="queue-timing">${escapeHtml(timingText)}</p>
+        <div class="queue-schedule">
+          <label>
+            投稿タイミング
+            <select data-queue-timing ${isPosted || isPosting ? 'disabled' : ''}>
+              <option value="now" ${timing === 'now' ? 'selected' : ''}>すぐに投稿</option>
+              <option value="scheduled" ${timing === 'scheduled' ? 'selected' : ''}>日時指定</option>
+            </select>
+          </label>
+          <label class="queue-scheduled-at" ${timing === 'scheduled' ? '' : 'hidden'}>
+            投稿日時
+            <input type="datetime-local" data-queue-scheduled-at value="${escapeHtml(scheduledValue)}" min="${escapeHtml(localDateTimeValue(new Date(Date.now() + 60_000)))}" ${isPosted || isPosting ? 'disabled' : ''}>
+          </label>
+        </div>
+        ${timing === 'scheduled' && item.scheduledAt ? `<p class="queue-timing">投稿予定: ${escapeHtml(formatScheduledAt(item.scheduledAt))}</p>` : ''}
         ${item.error ? `<p class="queue-error">${escapeHtml(item.error)}</p>` : ''}
       </div>
       <div class="queue-actions">
@@ -846,8 +844,6 @@ document.querySelectorAll('.filter').forEach((button) => {
   });
 });
 
-publishTiming.addEventListener('change', updatePublishTimingFields);
-
 async function processQueueItem(item) {
   if (!item || item.status === 'posted' || item.status === 'posting') return;
 
@@ -883,16 +879,9 @@ async function runScheduledQueue() {
   }
 }
 
-addToQueue.addEventListener('click', async () => {
+addToQueue.addEventListener('click', () => {
   const focused = photos.find((photo) => photo.id === focusedId);
   if (!focused) return;
-
-  const isScheduled = publishTiming.value === 'scheduled';
-  const scheduledDate = isScheduled ? new Date(scheduledAt.value) : null;
-  if (isScheduled && (!scheduledAt.value || Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now())) {
-    window.alert('現在より後の投稿日時を指定してください。');
-    return;
-  }
 
   const queueItem = {
     id: `queue-${Date.now()}`,
@@ -908,9 +897,9 @@ addToQueue.addEventListener('click', async () => {
     driveFolderUrl,
     originalUrl: focused.originalUrl,
     publishImageUrl: focused.publishImageUrl,
-    publishTiming: isScheduled ? 'scheduled' : 'now',
-    scheduledAt: isScheduled ? scheduledDate.toISOString() : null,
-    status: isScheduled ? 'scheduled' : 'pending'
+    publishTiming: 'now',
+    scheduledAt: null,
+    status: 'pending'
   };
 
   queue = [
@@ -919,10 +908,46 @@ addToQueue.addEventListener('click', async () => {
   ];
   saveQueue();
   render();
+});
 
-  if (!isScheduled) {
-    await processQueueItem(queueItem);
+queueList.addEventListener('change', (event) => {
+  const queueItem = event.target.closest('.queue-item');
+  const item = queue.find((entry) => entry.id === queueItem?.dataset.queueId);
+  if (!item || item.status === 'posted' || item.status === 'posting') return;
+
+  if (event.target.matches('[data-queue-timing]')) {
+    if (event.target.value === 'scheduled') {
+      const dateInput = queueItem.querySelector('[data-queue-scheduled-at]');
+      const scheduledDate = new Date(dateInput.value);
+      item.publishTiming = 'scheduled';
+      item.scheduledAt = scheduledDate.getTime() > Date.now()
+        ? scheduledDate.toISOString()
+        : new Date(Date.now() + 10 * 60_000).toISOString();
+      item.status = 'scheduled';
+      item.error = '';
+    } else {
+      item.publishTiming = 'now';
+      item.scheduledAt = null;
+      item.status = 'pending';
+      item.error = '';
+    }
   }
+
+  if (event.target.matches('[data-queue-scheduled-at]')) {
+    const scheduledDate = new Date(event.target.value);
+    if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+      window.alert('現在より後の投稿日時を指定してください。');
+      render();
+      return;
+    }
+    item.publishTiming = 'scheduled';
+    item.scheduledAt = scheduledDate.toISOString();
+    item.status = 'scheduled';
+    item.error = '';
+  }
+
+  saveQueue();
+  render();
 });
 
 queueList.addEventListener('click', async (event) => {
@@ -962,7 +987,6 @@ window.addEventListener('focus', runScheduledQueue);
 window.setInterval(runScheduledQueue, 30_000);
 
 updateInstagramTokenStatus();
-updatePublishTimingFields();
 render();
 restoreDriveCatalogCache();
 runScheduledQueue();

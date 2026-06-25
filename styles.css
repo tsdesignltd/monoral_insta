@@ -752,13 +752,6 @@ textarea {
   resize: vertical;
 }
 
-.schedule-note {
-  margin: -6px 0 0;
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
 .primary-action {
   background: var(--cedar);
   color: #fff;
@@ -853,6 +846,24 @@ textarea {
   font-weight: 800;
 }
 
+.queue-schedule {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(190px, 240px);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.queue-schedule label {
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.queue-schedule select,
+.queue-schedule input {
+  padding: 7px 8px;
+  font-size: 0.78rem;
+}
+
 .queue-error {
   margin-top: 6px !important;
   color: #8a3f2d !important;
@@ -939,6 +950,10 @@ textarea {
   .queue-actions {
     grid-column: 1 / -1;
     justify-content: stretch;
+  }
+
+  .queue-schedule {
+    grid-template-columns: 1fr;
   }
 
   .queue-actions button,
