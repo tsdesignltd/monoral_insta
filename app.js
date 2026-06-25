@@ -150,7 +150,7 @@ async function restoreDriveCatalogCache() {
       render();
     }
   } catch {
-    setSyncStatus('写真キャッシュを読み込めませんでした。Drive差分同期で再取得してください。', 'error');
+    setSyncStatus('写真キャッシュを読み込めませんでした。Drive同期で再取得してください。', 'error');
   }
 }
 
