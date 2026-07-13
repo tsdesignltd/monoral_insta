@@ -807,7 +807,11 @@ function render() {
       <img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.name)}">
       <div>
         <h4>${escapeHtml(item.name)}</h4>
-        <p>${escapeHtml(item.photographerName || '撮影者未設定')} / ${escapeHtml(item.type)} / ${escapeHtml(item.caption.slice(0, 48))}...</p>
+        <p>${escapeHtml(item.photographerName || '撮影者未設定')} / ${escapeHtml(item.type)}</p>
+        <label class="queue-caption-field">
+          投稿文章
+          <textarea data-queue-caption rows="5" ${isPosted || isPosting ? 'disabled' : ''}>${escapeHtml(item.caption || '')}</textarea>
+        </label>
         <div class="queue-schedule">
           <label>
             投稿タイミング
@@ -1039,6 +1043,18 @@ addToQueue.addEventListener('click', () => {
   ];
   saveQueue();
   render();
+});
+
+queueList.addEventListener('input', (event) => {
+  if (!event.target.matches('[data-queue-caption]')) return;
+
+  const queueItem = event.target.closest('.queue-item');
+  const item = queue.find((entry) => entry.id === queueItem?.dataset.queueId);
+  if (!item || item.status === 'posted' || item.status === 'posting') return;
+
+  item.caption = event.target.value;
+  item.error = '';
+  saveQueue();
 });
 
 queueList.addEventListener('change', (event) => {

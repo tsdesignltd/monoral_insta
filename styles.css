@@ -828,6 +828,33 @@ textarea {
   font-size: 0.86rem;
 }
 
+.queue-caption-field {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.queue-caption-field textarea {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.queue-caption-field textarea:disabled {
+  color: var(--muted);
+  background: #f6f4ed;
+}
+
 .queue-state {
   display: inline-flex;
   align-items: center;
