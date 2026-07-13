@@ -811,6 +811,11 @@ textarea {
   background: #fff;
 }
 
+.queue-item.is-posted {
+  border-color: #b9c8ae;
+  background: #fbfdf9;
+}
+
 .queue-item img {
   width: 76px;
   aspect-ratio: 1;
@@ -892,6 +897,10 @@ textarea {
   color: #594174 !important;
   font-size: 0.78rem !important;
   font-weight: 800;
+}
+
+.queue-timing.is-posted {
+  color: #3f5639 !important;
 }
 
 .queue-schedule {

@@ -803,7 +803,7 @@ function render() {
             ? '予約済み'
             : '投稿待ち';
     return `
-    <article class="queue-item" data-queue-id="${escapeHtml(item.id)}">
+    <article class="queue-item ${isPosted ? 'is-posted' : ''}" data-queue-id="${escapeHtml(item.id)}">
       <img src="${escapeHtml(item.src)}" alt="${escapeHtml(item.name)}">
       <div>
         <h4>${escapeHtml(item.name)}</h4>
@@ -831,12 +831,13 @@ function render() {
             <span>撮影者 <strong>@${escapeHtml(photographerInstagram)}</strong> を写真にタグ付け</span>
           </label>
         ` : '<p class="queue-tag-unavailable">撮影者のInstagramアカウント登録なし</p>'}
-        ${timing === 'scheduled' && item.scheduledAt ? `<p class="queue-timing">投稿予定: ${escapeHtml(formatScheduledAt(item.scheduledAt))}</p>` : ''}
+        ${isPosted && item.postedAt ? `<p class="queue-timing is-posted">投稿済み: ${escapeHtml(formatScheduledAt(item.postedAt))}</p>` : ''}
+        ${!isPosted && timing === 'scheduled' && item.scheduledAt ? `<p class="queue-timing">投稿予定: ${escapeHtml(formatScheduledAt(item.scheduledAt))}</p>` : ''}
         ${item.error ? `<p class="queue-error">${escapeHtml(item.error)}</p>` : ''}
       </div>
       <div class="queue-actions">
         <span class="queue-state ${isPosted ? 'is-posted' : ''} ${isPosting ? 'is-posting' : ''} ${isFailed ? 'is-failed' : ''} ${isScheduled ? 'is-scheduled' : ''}">${stateText}</span>
-        <button type="button" data-queue-action="post" ${isPosted || isPosting ? 'disabled' : ''}>${isPosting ? '投稿中' : '今すぐ投稿'}</button>
+        ${isPosted ? '' : `<button type="button" data-queue-action="post" ${isPosting ? 'disabled' : ''}>${isPosting ? '投稿中' : '今すぐ投稿'}</button>`}
         <button type="button" data-queue-action="delete" class="danger-action">削除</button>
       </div>
     </article>
