@@ -68,7 +68,7 @@ a {
   height: 100vh;
   padding: 28px 22px;
   color: #f7f5ec;
-  background: #2b1f18;
+  background: #6a5748;
   overflow: auto;
 }
 
@@ -132,8 +132,8 @@ h3 {
 .account-card {
   margin-top: 26px;
   padding: 16px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.07);
 }
 
 .drive-link,
