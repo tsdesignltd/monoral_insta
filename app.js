@@ -861,6 +861,24 @@ function formatPhotoDate(value) {
   }).format(date);
 }
 
+function inferPhotoDateFromText(value) {
+  const text = String(value || '');
+  const compactDate = text.match(/(?:^|[^\d])((?:19|20)\d{2})(\d{2})(\d{2})(?:[^\d]|$)/);
+  if (compactDate) {
+    return `${compactDate[1]}/${compactDate[2]}/${compactDate[3]}`;
+  }
+
+  const separatedDate = text.match(/((?:19|20)\d{2})[-_/年.](\d{1,2})(?:[-_/月.](\d{1,2}))?/);
+  if (separatedDate) {
+    const year = separatedDate[1];
+    const month = separatedDate[2].padStart(2, '0');
+    const day = separatedDate[3]?.padStart(2, '0');
+    return day ? `${year}/${month}/${day}` : `${year}/${month}`;
+  }
+
+  return '';
+}
+
 function sortNewestFirst(photoA, photoB) {
   const timeA = new Date(photoA.modifiedTime || photoA.createdTime || 0).getTime();
   const timeB = new Date(photoB.modifiedTime || photoB.createdTime || 0).getTime();
@@ -869,7 +887,8 @@ function sortNewestFirst(photoA, photoB) {
 
 function displayPhotoTakenAt(photo) {
   const value = photo.takenTime || photo.createdTime || photo.modifiedTime;
-  return value ? formatPhotoDate(value) : '';
+  return formatPhotoDate(value)
+    || inferPhotoDateFromText(`${photo.folderPath || ''} ${photo.name || ''}`);
 }
 
 function renderLatestByPhotographer() {
