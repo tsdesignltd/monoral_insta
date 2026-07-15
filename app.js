@@ -357,6 +357,60 @@ function instagramGraphUrl(path) {
   return `https://graph.instagram.com/v25.0/${path}`;
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function waitForInstagramContainer(creationId, token) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const statusUrl = new URL(instagramGraphUrl(encodeURIComponent(creationId)));
+    statusUrl.searchParams.set('fields', 'status_code,status');
+    statusUrl.searchParams.set('access_token', token);
+
+    const response = await fetch(statusUrl);
+    const result = await response.json();
+    const statusCode = String(result.status_code || '').toUpperCase();
+
+    if (statusCode === 'FINISHED' || statusCode === 'PUBLISHED') return;
+    if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+      throw new Error(result.status || `Instagramメディア準備に失敗しました: ${statusCode}`);
+    }
+
+    await wait(2500);
+  }
+}
+
+async function publishInstagramContainer(igUserId, creationId, token) {
+  const publishParams = new URLSearchParams({
+    creation_id: creationId,
+    access_token: token
+  });
+
+  let lastMessage = '';
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const publishResponse = await fetch(instagramGraphUrl(`${encodeURIComponent(igUserId)}/media_publish`), {
+      method: 'POST',
+      body: publishParams
+    });
+    const publishResult = await publishResponse.json();
+
+    if (publishResponse.ok && publishResult.id) {
+      return publishResult.id;
+    }
+
+    lastMessage = publishResult.error?.message || 'Instagram投稿公開に失敗しました。';
+    if (!/media id is not available|not available|not ready|processing/i.test(lastMessage)) {
+      throw new Error(lastMessage);
+    }
+
+    await wait(3000);
+  }
+
+  throw new Error(`${lastMessage}。数十秒後にもう一度「今すぐ投稿」を押してください。`);
+}
+
 async function postToInstagram(item) {
   const token = instagramAccessToken.value.trim();
 
@@ -408,24 +462,12 @@ async function postToInstagram(item) {
     throw new Error(createResult.error?.message || 'Instagramメディア作成に失敗しました。');
   }
 
-  const publishParams = new URLSearchParams({
-    creation_id: createResult.id,
-    access_token: token
-  });
-
-  const publishResponse = await fetch(instagramGraphUrl(`${encodeURIComponent(igUserId)}/media_publish`), {
-    method: 'POST',
-    body: publishParams
-  });
-  const publishResult = await publishResponse.json();
-
-  if (!publishResponse.ok || !publishResult.id) {
-    throw new Error(publishResult.error?.message || 'Instagram投稿公開に失敗しました。');
-  }
+  await waitForInstagramContainer(createResult.id, token);
+  const mediaId = await publishInstagramContainer(igUserId, createResult.id, token);
 
   return {
     creationId: createResult.id,
-    mediaId: publishResult.id
+    mediaId
   };
 }
 
