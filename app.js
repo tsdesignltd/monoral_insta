@@ -711,6 +711,18 @@ function formatScheduledAt(value) {
   }).format(date);
 }
 
+function formatPhotoDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
+
 function sortNewestFirst(photoA, photoB) {
   const timeA = new Date(photoA.modifiedTime || photoA.createdTime || 0).getTime();
   const timeB = new Date(photoB.modifiedTime || photoB.createdTime || 0).getTime();
@@ -719,7 +731,7 @@ function sortNewestFirst(photoA, photoB) {
 
 function displayPhotoTakenAt(photo) {
   const value = photo.takenTime || photo.createdTime || photo.modifiedTime;
-  return value ? formatScheduledAt(value) : '';
+  return value ? formatPhotoDate(value) : '';
 }
 
 function renderLatestByPhotographer() {
