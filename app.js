@@ -7,12 +7,15 @@ const defaultInstagramAccountId = '17841403518578706';
 const instagramTokenStorageKey = 'insta.instagramAccessToken';
 const queueStorageKey = 'insta.approvalQueue';
 const randomSelectionStorageKey = 'insta.randomSelectionHistory';
+const openaiApiKeyStorageKey = 'insta.openaiApiKey';
+const openaiModelStorageKey = 'insta.openaiModel';
 const driveCacheDatabaseName = 'monoral-insta-cache';
 const driveCacheStoreName = 'drive-catalog';
 const driveCacheRecordKey = 'current';
 const latestPageSize = 30;
 const visiblePhotoGridRows = 3;
 const randomSelectionCooldownMs = 7 * 24 * 60 * 60 * 1000;
+const defaultOpenaiModel = 'gpt-5.6';
 const photographerInstagramAccounts = new Map([
   ['松下雄一', 'yuich1hz_lc78tc'],
   ['吉田佳弘', 'yoshiyoshi_99'],
@@ -38,6 +41,9 @@ const instagramAccessToken = document.querySelector('#instagramAccessToken');
 const toggleInstagramToken = document.querySelector('#toggleInstagramToken');
 const verifyInstagramConnection = document.querySelector('#verifyInstagramConnection');
 const clearInstagramToken = document.querySelector('#clearInstagramToken');
+const openaiApiKey = document.querySelector('#openaiApiKey');
+const toggleOpenaiKey = document.querySelector('#toggleOpenaiKey');
+const openaiModel = document.querySelector('#openaiModel');
 const instagramTokenStatus = document.querySelector('#instagramTokenStatus');
 const instagramConnectionPill = document.querySelector('#instagramConnectionPill');
 const syncStatus = document.querySelector('#syncStatus');
@@ -58,6 +64,8 @@ const exportPlan = document.querySelector('#exportPlan');
 googleClientId.value = localStorage.getItem('instaha.googleClientId') || defaultGoogleClientId;
 instagramBusinessId.value = localStorage.getItem('insta.instagramBusinessId') || defaultInstagramAccountId;
 instagramAccessToken.value = localStorage.getItem(instagramTokenStorageKey) || '';
+openaiApiKey.value = localStorage.getItem(openaiApiKeyStorageKey) || '';
+openaiModel.value = localStorage.getItem(openaiModelStorageKey) || defaultOpenaiModel;
 syncDrive.dataset.label = syncDrive.textContent.trim();
 
 function loadStoredQueue() {
@@ -688,6 +696,85 @@ function generateMonoralCaption(photo) {
     .trim();
 }
 
+async function imageUrlToDataUrl(url) {
+  const response = await fetch(url, { mode: 'cors' });
+  if (!response.ok) throw new Error('画像データを読み込めませんでした。');
+  const blob = await response.blob();
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function monoralCaptionPrompt(photo) {
+  return [
+    'MONORAL OUTDOORのInstagram投稿文を日本語で1案だけ作成してください。',
+    '画像を具体的に観察し、写っている道具、自然環境、火、光、季節感、余白を文章へ反映してください。',
+    '現在のアカウントの表現に寄せて、静かで落ち着いた文体にしてください。',
+    '広告っぽい煽り、過度な絵文字、説明しすぎ、ハッシュタグ、撮影者名、見出しは不要です。',
+    '2〜4文、改行を含む短い投稿文にしてください。',
+    'MONORAL OUTDOORの道具が、外で過ごす時間のそばに自然にある、というニュアンスを大切にしてください。',
+    `写真ファイル名: ${photo.name}`,
+    `撮影日: ${displayPhotoTakenAt(photo) || '不明'}`
+  ].join('\n');
+}
+
+function extractOpenaiText(result) {
+  if (result.output_text) return result.output_text;
+
+  return (result.output || [])
+    .flatMap((item) => item.content || [])
+    .map((part) => part.text || '')
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function generateAiCaption(photo) {
+  const apiKey = openaiApiKey.value.trim();
+  if (!apiKey) return generateMonoralCaption(photo);
+
+  localStorage.setItem(openaiApiKeyStorageKey, apiKey);
+  localStorage.setItem(openaiModelStorageKey, openaiModel.value.trim() || defaultOpenaiModel);
+
+  let imageUrl = photo.src;
+  try {
+    imageUrl = await imageUrlToDataUrl(photo.src);
+  } catch {
+    imageUrl = photo.publishImageUrl || photo.originalUrl || photo.src;
+  }
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: openaiModel.value.trim() || defaultOpenaiModel,
+      input: [{
+        role: 'user',
+        content: [
+          { type: 'input_text', text: monoralCaptionPrompt(photo) },
+          { type: 'input_image', image_url: imageUrl, detail: 'low' }
+        ]
+      }],
+      max_output_tokens: 360
+    })
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error?.message || 'AIキャプション生成に失敗しました。');
+  }
+
+  const generated = extractOpenaiText(result).trim();
+  if (!generated) throw new Error('AIキャプションが空でした。');
+  return generated.replace(/#\S+/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function defaultHashtags() {
   return '#monoral #焚き火台 #ミニマルキャンプ #軽量焚き火台 #microcamping #ワイヤフレーム #wireflame';
 }
@@ -948,6 +1035,19 @@ syncDrive.addEventListener('click', syncDrivePhotos);
 
 instagramAccessToken.addEventListener('input', saveInstagramToken);
 
+openaiApiKey.addEventListener('input', () => {
+  const key = openaiApiKey.value.trim();
+  if (key) {
+    localStorage.setItem(openaiApiKeyStorageKey, key);
+  } else {
+    localStorage.removeItem(openaiApiKeyStorageKey);
+  }
+});
+
+openaiModel.addEventListener('input', () => {
+  localStorage.setItem(openaiModelStorageKey, openaiModel.value.trim() || defaultOpenaiModel);
+});
+
 verifyInstagramConnection.addEventListener('click', async () => {
   verifyInstagramConnection.disabled = true;
   verifyInstagramConnection.textContent = '確認中';
@@ -971,6 +1071,13 @@ toggleInstagramToken.addEventListener('click', () => {
   toggleInstagramToken.setAttribute('aria-label', shouldShow ? 'アクセストークンを隠す' : 'アクセストークンを表示');
 });
 
+toggleOpenaiKey.addEventListener('click', () => {
+  const shouldShow = openaiApiKey.type === 'password';
+  openaiApiKey.type = shouldShow ? 'text' : 'password';
+  toggleOpenaiKey.textContent = shouldShow ? '隠す' : '表示';
+  toggleOpenaiKey.setAttribute('aria-label', shouldShow ? 'OpenAI API Keyを隠す' : 'OpenAI API Keyを表示');
+});
+
 clearInstagramToken.addEventListener('click', () => {
   instagramAccessToken.value = '';
   instagramAccessToken.type = 'password';
@@ -981,12 +1088,25 @@ clearInstagramToken.addEventListener('click', () => {
   setInstagramConnectionState('Meta API 接続待ち');
 });
 
-generateCaption.addEventListener('click', () => {
+generateCaption.addEventListener('click', async () => {
   const focused = photos.find((photo) => photo.id === focusedId);
   if (!focused) return;
 
-  caption.value = generateMonoralCaption(focused);
-  hashtags.value = defaultHashtags();
+  generateCaption.disabled = true;
+  generateCaption.classList.add('is-loading');
+  generateCaption.textContent = openaiApiKey.value.trim() ? 'AI生成中' : 'キャプション生成中';
+
+  try {
+    caption.value = await generateAiCaption(focused);
+    hashtags.value = defaultHashtags();
+  } catch (error) {
+    caption.value = generateMonoralCaption(focused);
+    window.alert(`${error.message || 'AIキャプション生成に失敗しました。'}\nテンプレート文を入れました。`);
+  } finally {
+    generateCaption.classList.remove('is-loading');
+    generateCaption.textContent = 'キャプション自動生成';
+    generateCaption.disabled = !photos.find((photo) => photo.id === focusedId);
+  }
 });
 
 randomSelectPhoto.addEventListener('click', selectRandomPhoto);

@@ -73,6 +73,17 @@
           </div>
           <p id="instagramTokenStatus" class="token-status">トークンを入力すると、このブラウザに保存されます。</p>
           <p id="syncStatus" class="sync-status">前回キャッシュを表示します。更新する場合はDrive同期を押してください。</p>
+          <label>
+            OpenAI API Key
+            <div class="token-field">
+              <input id="openaiApiKey" type="password" autocomplete="off" placeholder="画像認識キャプション生成に使用">
+              <button id="toggleOpenaiKey" type="button" class="token-control" aria-label="OpenAI API Keyを表示">表示</button>
+            </div>
+          </label>
+          <label>
+            OpenAI Model
+            <input id="openaiModel" type="text" autocomplete="off" placeholder="gpt-5.6">
+          </label>
         </section>
 
         <section class="metrics" aria-label="posting metrics">
@@ -173,6 +184,6 @@
     </main>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="./app.js?v=20260715-photo-date-only"></script>
+    <script src="./app.js?v=20260715-ai-caption"></script>
   </body>
 </html>
