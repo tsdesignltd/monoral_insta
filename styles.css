@@ -616,6 +616,7 @@ button.is-loading::before {
   min-width: 0;
   border: 1px solid var(--line);
   background: var(--panel);
+  cursor: pointer;
   overflow: hidden;
 }
 
@@ -673,38 +674,23 @@ button.is-loading::before {
   overflow: hidden;
 }
 
-.score-row {
-  display: flex;
-  gap: 5px;
-}
-
-.score-dot {
-  width: 18px;
-  height: 6px;
-  background: var(--line);
-}
-
-.score-dot.is-on {
-  background: var(--moss);
-}
-
-.card-actions {
+.photo-posted-history {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 3px;
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
 }
 
-.card-actions button {
-  min-height: 34px;
-  padding: 0 8px;
+.photo-posted-history span,
+.photo-posted-history time {
+  color: #3f5639;
+  font-size: 0.68rem;
+  font-weight: 850;
 }
 
-.keep {
-  background: #e8efe4;
-}
-
-.reject {
-  background: #f4e7df;
+.photo-posted-history time {
+  overflow-wrap: anywhere;
 }
 
 .composer {

@@ -519,6 +519,7 @@ function mapDrivePhoto(file, photographer, folderPath) {
     mimeType: file.mimeType,
     width: file.imageMediaMetadata?.width,
     height: file.imageMediaMetadata?.height,
+    takenTime: file.imageMediaMetadata?.time || '',
     modifiedTime: file.modifiedTime,
     createdTime: file.createdTime,
     folderPath,
@@ -538,7 +539,7 @@ async function listImagesUnderFolder(folder, photographer, folderPath, visitedFo
   const [imageFiles, childFolders] = await Promise.all([
     listAllDriveFiles({
       q: `'${parentId}' in parents and mimeType contains 'image/' and trashed = false`,
-      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webContentLink, webViewLink, modifiedTime, createdTime, imageMediaMetadata(width, height))',
+      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webContentLink, webViewLink, modifiedTime, createdTime, imageMediaMetadata(width, height, time))',
       orderBy: 'modifiedTime desc'
     }),
     listAllDriveFiles({
@@ -606,6 +607,7 @@ async function syncDrivePhotos() {
 
       const hasChanged = cachedPhoto.modifiedTime !== photo.modifiedTime
         || cachedPhoto.name !== photo.name
+        || cachedPhoto.takenTime !== photo.takenTime
         || cachedPhoto.folderPath !== photo.folderPath
         || cachedPhoto.photographerId !== photo.photographerId;
 
@@ -619,7 +621,8 @@ async function syncDrivePhotos() {
         ...photo,
         score: cachedPhoto.score ?? photo.score,
         status: cachedPhoto.status || photo.status,
-        angle: cachedPhoto.angle || photo.angle
+        angle: cachedPhoto.angle || photo.angle,
+        takenTime: photo.takenTime || cachedPhoto.takenTime || ''
       };
     });
 
@@ -714,6 +717,11 @@ function sortNewestFirst(photoA, photoB) {
   return timeB - timeA;
 }
 
+function displayPhotoTakenAt(photo) {
+  const value = photo.takenTime || photo.createdTime || photo.modifiedTime;
+  return value ? formatScheduledAt(value) : '';
+}
+
 function renderLatestByPhotographer() {
   if (!photographerFolders.length) {
     latestByPhotographer.innerHTML = `
@@ -743,7 +751,7 @@ function renderLatestByPhotographer() {
       <button class="latest-photo" type="button" data-id="${escapeHtml(photo.id)}" aria-label="${escapeHtml(`${folder.name} ${photo.name}`)}">
         <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.name)}">
         <span>${escapeHtml(photo.name)}</span>
-        <small>${escapeHtml(photo.folderPath || folder.name)}</small>
+        <small>${escapeHtml(displayPhotoTakenAt(photo))}</small>
       </button>
     `).join('') : '<p class="latest-empty">この撮影者フォルダには写真がありません。</p>';
 
@@ -780,19 +788,23 @@ function render() {
   photographerSelect.value = selectedPhotographer;
 
   photoGrid.innerHTML = visiblePhotos.length ? visiblePhotos.map((photo) => {
-    const dots = Array.from({ length: 5 }, (_, index) => `<span class="score-dot ${index < photo.score ? 'is-on' : ''}"></span>`).join('');
+    const postedDates = queue
+      .filter((item) => item.status === 'posted' && item.sourceId === photo.id && item.postedAt)
+      .map((item) => item.postedAt)
+      .sort((dateA, dateB) => new Date(dateB).getTime() - new Date(dateA).getTime());
+    const postedHistory = postedDates.length ? `
+      <div class="photo-posted-history" aria-label="投稿履歴">
+        <span>投稿済み</span>
+        ${postedDates.map((postedAt) => `<time datetime="${escapeHtml(postedAt)}">${escapeHtml(formatScheduledAt(postedAt))}</time>`).join('')}
+      </div>
+    ` : '';
     return `
       <article class="photo-card ${photo.id === focusedId ? 'is-focused' : ''}" data-id="${escapeHtml(photo.id)}">
         <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.name)}">
         <div class="photo-body">
           <p class="photo-name">${escapeHtml(photo.name)}</p>
-          <p class="photo-meta">${escapeHtml(photo.photographerName || '撮影者未設定')}</p>
-          <p class="photo-path">${escapeHtml(photo.folderPath || '')}</p>
-          <div class="score-row" aria-label="score ${photo.score} of 5">${dots}</div>
-          <div class="card-actions">
-            <button class="keep" type="button" data-action="selected">採用</button>
-            <button class="reject" type="button" data-action="rejected">保留</button>
-          </div>
+          <p class="photo-path">${escapeHtml(displayPhotoTakenAt(photo))}</p>
+          ${postedHistory}
         </div>
       </article>
     `;
