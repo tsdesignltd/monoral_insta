@@ -428,8 +428,10 @@ async function postToInstagram(item) {
   localStorage.setItem(instagramTokenStorageKey, token);
   setInstagramConnectionState(profile.username ? `@${profile.username} 接続済み` : 'Instagram 接続済み', 'success');
 
-  if (item.type !== 'フィード投稿') {
-    throw new Error('現在の実投稿はフィード投稿のみ対応しています。リール/ストーリーズはMeta API設定を追加してください。');
+  const isFeedPost = item.type === 'フィード投稿';
+  const isStoryPost = item.type === 'ストーリーズ';
+  if (!isFeedPost && !isStoryPost) {
+    throw new Error('現在の実投稿はフィード投稿とストーリーズに対応しています。リールはMeta API設定を追加してください。');
   }
 
   const captionText = `${item.caption}\n\n${item.hashtags}`.trim();
@@ -440,11 +442,18 @@ async function postToInstagram(item) {
 
   const createParams = new URLSearchParams({
     image_url: imageUrl,
-    caption: captionText,
     access_token: token
   });
 
-  if (item.tagPhotographer && item.photographerInstagram) {
+  if (isStoryPost) {
+    createParams.set('media_type', 'STORIES');
+  }
+
+  if (isFeedPost) {
+    createParams.set('caption', captionText);
+  }
+
+  if (isFeedPost && item.tagPhotographer && item.photographerInstagram) {
     createParams.set('user_tags', JSON.stringify([{
       username: item.photographerInstagram,
       x: 0.5,
