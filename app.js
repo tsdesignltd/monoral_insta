@@ -6,11 +6,13 @@ const defaultGoogleClientId = '728021192860-rv5fnl6clav3mbjujfqjv8vupjl2hgjc.app
 const defaultInstagramAccountId = '17841403518578706';
 const instagramTokenStorageKey = 'insta.instagramAccessToken';
 const queueStorageKey = 'insta.approvalQueue';
+const randomSelectionStorageKey = 'insta.randomSelectionHistory';
 const driveCacheDatabaseName = 'monoral-insta-cache';
 const driveCacheStoreName = 'drive-catalog';
 const driveCacheRecordKey = 'current';
 const latestPageSize = 30;
 const visiblePhotoGridRows = 3;
+const randomSelectionCooldownMs = 7 * 24 * 60 * 60 * 1000;
 const photographerInstagramAccounts = new Map([
   ['松下雄一', 'yuich1hz_lc78tc'],
   ['吉田佳弘', 'yoshiyoshi_99'],
@@ -45,6 +47,7 @@ const photoGrid = document.querySelector('#photoGrid');
 const previewFrame = document.querySelector('.preview-frame');
 const previewImage = document.querySelector('#previewImage');
 const caption = document.querySelector('#caption');
+const randomSelectPhoto = document.querySelector('#randomSelectPhoto');
 const generateCaption = document.querySelector('#generateCaption');
 const hashtags = document.querySelector('#hashtags');
 const postType = document.querySelector('#postType');
@@ -82,6 +85,45 @@ function loadStoredQueue() {
 
 function saveQueue() {
   localStorage.setItem(queueStorageKey, JSON.stringify(queue));
+}
+
+function loadRandomSelectionHistory() {
+  try {
+    const history = JSON.parse(localStorage.getItem(randomSelectionStorageKey) || '{}');
+    return history && typeof history === 'object' && !Array.isArray(history) ? history : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRandomSelectionHistory(history) {
+  localStorage.setItem(randomSelectionStorageKey, JSON.stringify(history));
+}
+
+function selectRandomPhoto() {
+  if (!photos.length) {
+    window.alert('Drive同期後にランダム選択できます。');
+    return;
+  }
+
+  const now = Date.now();
+  const activePhotoIds = new Set(photos.map((photo) => photo.id));
+  let history = Object.fromEntries(Object.entries(loadRandomSelectionHistory()).filter(([id, selectedAt]) => (
+    activePhotoIds.has(id)
+    && Number.isFinite(Number(selectedAt))
+    && now - Number(selectedAt) < randomSelectionCooldownMs
+  )));
+
+  let candidates = photos.filter((photo) => !history[photo.id]);
+  if (!candidates.length) {
+    history = {};
+    candidates = photos;
+  }
+
+  const selectedPhoto = candidates[Math.floor(Math.random() * candidates.length)];
+  history[selectedPhoto.id] = now;
+  saveRandomSelectionHistory(history);
+  focusPhoto(selectedPhoto.id);
 }
 
 function openDriveCacheDatabase() {
@@ -769,6 +811,7 @@ function render() {
 
   const focused = photos.find((photo) => photo.id === focusedId);
   previewFrame.classList.toggle('has-image', Boolean(focused));
+  randomSelectPhoto.disabled = photos.length === 0;
   generateCaption.disabled = !focused;
   if (focused) {
     previewImage.src = focused.src;
@@ -921,6 +964,8 @@ generateCaption.addEventListener('click', () => {
   caption.value = generateMonoralCaption(focused);
   hashtags.value = defaultHashtags();
 });
+
+randomSelectPhoto.addEventListener('click', selectRandomPhoto);
 
 photographerSelect.addEventListener('change', () => {
   selectedPhotographer = photographerSelect.value;
